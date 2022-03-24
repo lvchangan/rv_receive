@@ -63,7 +63,7 @@ void *Tcp::threadListen(void *p) {
 }
 
 int Tcp::doStartListen() {
-	ALOGI("LCA AAA\n");
+	//ALOGI("LCA AAA\n");
     int fd_socket = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
     ALOGI("LCA AAA doStartListen fd_socket=%d\n", fd_socket);
 	/*
@@ -95,7 +95,7 @@ int Tcp::doStartListen() {
         close(fd_socket);
         return -__LINE__;
     }
-	ALOGI("LCA BBB\n");
+	//ALOGI("LCA BBB\n");
     socketFd = fd_socket;
     this->listening = true;
     while (this->listening) {
@@ -118,7 +118,7 @@ int Tcp::doStartListen() {
             }
         }
     }
-	ALOGI("LCA end doStartListen\n");
+	//ALOGI("LCA end doStartListen\n");
     return fd_socket;
 }
 

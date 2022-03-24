@@ -123,7 +123,7 @@ int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
     v_stride = mpp_frame_get_ver_stride(frame);
     fmt = mpp_frame_get_fmt(frame);
     buffer = mpp_frame_get_buffer(frame);
-	printf("LCA:write file wxh[%dx%d],hxv[%dx%d],fmt:0x%x\n",width,height,h_stride,v_stride,fmt);
+	//printf("LCA:write file wxh[%dx%d],hxv[%dx%d],fmt:0x%x\n",width,height,h_stride,v_stride,fmt);
     if(!buffer)
     {
     	printf("write error\n");
@@ -238,7 +238,7 @@ int Codec::decode_one_pkt(unsigned char *buf, int size) {
                         }
 
                         if (mDisPlay) {
-							printf("decode_get_frame ID:%d get srcFrm %d.\n", mID, mFrmCnt++);
+							//printf("decode_get_frame ID:%d get srcFrm %d.\n", mID, mFrmCnt++);
                             if (mFout) {
 	                             if(mFrmCnt >= 20)
 	                             {

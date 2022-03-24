@@ -28,7 +28,7 @@
 #include "SendPackageCache.h"
 
 #include "mpp/mpp_decoder_h264.h"
-
+#include "faad/rv1108_aad.h"
 class TcpNativeInfo;
 
 class Tcp;
@@ -104,6 +104,16 @@ public:
         BindBufferVideo(VideoBuffer, VideoBufferSize);
     }
 
+	void CreateBufferAudio(){
+         if(bufferAudio != nullptr)
+        {
+            return;
+        }
+        uint32_t AudioBufferSize = 1024;
+        uint8_t* AudioBuffer = new uint8_t[AudioBufferSize];
+        BindBufferAudio(AudioBuffer, AudioBufferSize);
+    }
+
      void ReleaseBufferVideo()
     {
         if(bufferVideo != nullptr)
@@ -111,6 +121,17 @@ public:
             delete[] bufferVideo;
             bufferVideo = nullptr;
             lenBufVideo = 0;
+        }
+        return;
+    }
+
+	void ReleaseBufferAudio()
+    {
+        if(bufferAudio != nullptr)
+        {
+            delete[] bufferAudio;
+            bufferAudio = nullptr;
+            lenBufAudio = 0;
         }
         return;
     }
@@ -342,6 +363,15 @@ private:
 	 pthread_t tidMppdec = 0;
 	 Event Mppevent;
 	 pthread_mutex_t mutex_thread_Mpp_H264data;
+
+	 private:
+	 AAC2PCM *faaddecoder;
+	 std::list<ThreadSendData *> FaadAACBufferList; 
+	 static void *threadAACdec(void *p);
+	 int decoder_AAC_thread();
+	 pthread_t tidAACdec = 0;
+	 Event AACdecevent;
+	 pthread_mutex_t mutex_thread_AAC_Dec;
 };
 
 

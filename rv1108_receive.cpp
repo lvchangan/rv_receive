@@ -4,7 +4,10 @@
 #include "rv1108_receive.h"
 static TcpNativeInfo tcpNativeInfo;
 static FILE *fp_H264;
+static FILE *fp_aac;
+
 static int fps = 0;
+static int fps_aac = 0;
 static int _on_socket_received(void *UNUSED(user), TcpClient *client, int type, const char *msg,
                              const void *data, int64_t off, long len)
 {
@@ -19,11 +22,21 @@ static int _on_socket_received(void *UNUSED(user), TcpClient *client, int type, 
 	}
 	else if(type == TYPE_MEDIA_VIDEODATA)
 	{
+		/*
 		fps++;
-		if(fps <= 20)
+		if(fps < 20)
 		fwrite(data,1,len,fp_H264);
 		if(fps == 20)
 			fclose(fp_H264);
+		*/
+	}
+	else if(type == TYPE_MEDIA_AUDIODATA)
+	{
+		fps_aac++;
+		if(fps_aac < 500)
+		fwrite(data,1,len,fp_aac);
+		if(fps_aac == 500)
+			fclose(fp_aac);
 	}
 	return 0;
 }
@@ -32,6 +45,7 @@ static int _on_socket_received(void *UNUSED(user), TcpClient *client, int type, 
 int main()
 {
 	fp_H264 = fopen("/data/receive.h264","wb+");
+	fp_aac = fopen("data/receive.aac","wb+");
     tcpNativeInfo.SetCallback(nullptr, _on_socket_received);
 	Tcp *rv1108_receive = new Tcp(&tcpNativeInfo);
 	rv1108_receive->StartServer(6666);

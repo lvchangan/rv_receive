@@ -18,12 +18,14 @@ set(RV1108_RECEIVE_LIST
     socket/SendPackageCache.cpp
     socket/RingBuffer.cpp
     socket/CombinePackage.cpp
+    faad/rv1108_aad.cpp
 )
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/mpp
     ${CMAKE_CURRENT_SOURCE_DIR}/socket
+    ${CMAKE_CURRENT_SOURCE_DIR}/faad
 )
 
 add_definitions(-DLINUX -DSUPPORT_ION -DENABLE_ASSERT)
@@ -34,6 +36,7 @@ target_link_libraries(rv1108_receive
     z 
     c 
     pthread
+    libfaad.so
 )
 
 
