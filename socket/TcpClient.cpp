@@ -13,7 +13,7 @@
  */
 TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockaddr_in *addr)
         : seq(0), tcp(tcp), mReceivedAudioProcessor(this), mReceivedVideoProcessor(this),
-          sendCacheManager(this) {
+          sendCacheManager(this){
     this->nativeInfo = nativeInfo;
     this->running = true;
     this->fd_socket = fd;
@@ -21,8 +21,6 @@ TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockadd
     struct timeval timeout = {3, 0};
     setsockopt(fd_socket, SOL_SOCKET, SO_SNDTIMEO, (char *) &timeout, sizeof(struct timeval));
     pthread_mutex_init(&mutex_write, NULL);
-	pthread_mutex_init(&mutex_thread_Mpp_H264data, NULL);
-	pthread_mutex_init(&mutex_thread_AAC_Dec, NULL);
 	
     memcpy(&this->addr, addr, sizeof(this->addr));
     //const char *ip = inet_ntoa(this->addr.sin_addr);
@@ -36,135 +34,46 @@ TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockadd
     mUdpCombinePackage = new UdpCombinePackage(this);
     CreateBufferVideo();
 	CreateBufferAudio();
-	
-	pthread_t mpp_tid;
-	pthread_create(&mpp_tid, nullptr, threadMppdec, this);
 
-	pthread_t aac_tid;
-	pthread_create(&aac_tid, nullptr, threadAACdec, this);	
+	MppDecoderInit();
+	AACDecoderInit();
+	//pthread_t aac_tid;
+	//pthread_create(&aac_tid, nullptr, threadAACdec, this);	
 }
 	
-	
-void *TcpClient::threadMppdec(void *p) {
-	TcpClient *client = (TcpClient *) p;
-	client->tidMppdec = pthread_self();
-	pthread_detach(pthread_self());
-	client->decoder_h264_thread();
-	return nullptr;
-}
-
-int TcpClient::decoder_h264_thread()
+int TcpClient::MppDecoderInit()
 {
 	int ret = 0;
 	mppctx = new Codec();
 	mppctx->mID = this->clientID;
 	ret = mppctx->init(MPP_VIDEO_CodingAVC,1920,1080, 1);
 	if (ret < 0) {
-		printf("LCA: failed to init codec\n");
+		printf("LCA: failed to init mpp\n");
 		return -1;
 	}
-
-	 while (!mppctx->mEos) {
-		ThreadSendData *data = nullptr;
-		if (MppH264BufferList.empty()) {
-			Mppevent.Wait(1000);
-		}
-		
-		pthread_mutex_lock(&mutex_thread_Mpp_H264data);
-		
-		if (MppH264BufferList.size() > 0) {
-			data = MppH264BufferList.front();
-			MppH264BufferList.pop_front();
-		}
-		
-		pthread_mutex_unlock(&mutex_thread_Mpp_H264data);
-
-		//printf("mpp CCCCC\n");
-		
-		if(data)
-		{
-			//printf("data->type=%d,data->dataSize=%d,data->capacity=%d\n",data->type,data->dataSize,data->capacity);
-			ret = mppctx->decode_one_pkt(data->data, data->capacity);
-			if (ret < 0) {
-				printf("failed to exec decode.\n");
-				return -2;
-			}
-			else
-			{
-				printf("decode_one_pkt success\n");
-			}
-			//printf("mpp EEEEE\n");
-			free(data);
-		}
-		
+	else
+	{
+		this->mediaDecoderReady = false;
 	}
-		
-	mppctx->deinit();
-	delete mppctx;
 	return 0;
 }
 
-void *TcpClient::threadAACdec(void *p) {
-	TcpClient *client = (TcpClient *) p;
-	client->tidAACdec = pthread_self();
-	pthread_detach(pthread_self());
-	client->decoder_AAC_thread();
-	return nullptr;
-}
-
-int TcpClient::decoder_AAC_thread()
+int TcpClient::AACDecoderInit()
 {
 	faaddecoder = new AAC2PCM();
-	faaddecoder->faad_decoder_create(0,0,0);
-	
-	int pcmsize = 0;
-	unsigned char *pcmframe=(unsigned char *)malloc(1024*5);
-	
-	while (1) {
-		ThreadSendData *data = nullptr;
-		if (FaadAACBufferList.empty()) {
-			AACdecevent.Wait(1000);
-		}
-		
-		pthread_mutex_lock(&mutex_thread_AAC_Dec);
-		
-		if (FaadAACBufferList.size() > 0) {
-			data = FaadAACBufferList.front();
-			FaadAACBufferList.pop_front();
-		}
-		
-		pthread_mutex_unlock(&mutex_thread_AAC_Dec);
-		
-		if(data)
-		{
-			int ret = faaddecoder->faad_decode_frame(data->data,data->dataSize,pcmframe,&pcmsize);
-			if(ret > 0)
-			{
-				printf("decode aac error:%d\n",ret);
-			}
-			else
-			{					 
-				 if(faaddecoder->fp_pcm)
-				 {
-				 	fwrite( pcmframe,1, pcmsize,faaddecoder->fp_pcm);
-					static int pcm_fps = 0;
-					pcm_fps++; 
-					if(pcm_fps == 500)
-					{
-						fclose(faaddecoder->fp_pcm);
-					}
-				 }
-		 		 memset(pcmframe,0,pcmsize);
-			}
-			free(data);
-		}
-		
+	pcmframe=(unsigned char *)malloc(1024*5);
+	int ret = faaddecoder->faad_decoder_create(0,0,0);
+	if(ret < 0)
+	{
+		printf("LCA: failed to init faad\n");
+		return -1;
 	}
-	free(pcmframe);
-	delete faaddecoder;
+	else
+	{
+		this->audioDecoderReady= true;
+	}
 	return 0;
 }
-
 
 /**
  * 如果是创建一个新的Client（主动连接Server），请使用此构造函数初始化
@@ -189,18 +98,6 @@ TcpClient::~TcpClient() {
     }
     nativeInfo = nullptr;
     pthread_mutex_destroy(&mutex_write);
-	pthread_mutex_destroy(&mutex_thread_Mpp_H264data);
-	pthread_mutex_destroy(&mutex_thread_AAC_Dec);
-	if(mppctx)
-	{
-		delete mppctx;
-		mppctx = nullptr;
-	}
-	if(faaddecoder)
-	{
-		delete faaddecoder;
-		faaddecoder = nullptr;
-	}
 }
 
 void TcpClient::Release(bool selfDis) {
@@ -222,6 +119,18 @@ void TcpClient::Release(bool selfDis) {
         delete udpClient;
         udpClient = nullptr;
     }
+	if(mppctx)
+	{
+		delete mppctx;
+		mppctx = nullptr;
+	}
+	if(faaddecoder)
+	{
+		delete faaddecoder;
+		faaddecoder = nullptr;
+	}
+	if(pcmframe)
+		free(pcmframe);
     mReceivedAudioProcessor.Destroy();
     mReceivedVideoProcessor.Destroy();
     sendCacheManager.Destroy();
@@ -233,7 +142,7 @@ void TcpClient::SendRequestQuality() {
 	RequestQuality requestQuality = { 0 };
 	requestQuality.version = sizeof(RequestQuality);
 	requestQuality.width = 1920;
-	requestQuality.height = 1920;
+	requestQuality.height = 1080;
 	requestQuality.quality = 0;
 	requestQuality.video_fps = 0;
 	Send(TYPE_REQUEST_QUALITY, &requestQuality, sizeof(requestQuality));
@@ -717,7 +626,6 @@ void *TcpClient::threadReportData(void *p) {
 }
 
 void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
-	this->mediaDecoderReady = false;
     while (true) {
         if (!running) {
             break;
@@ -725,17 +633,10 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
 
         ThreadSendData *data = pProcessor->GetData();
         if (data != nullptr) {
-            //需要将数据发送出去
-			ThreadSendData *MEDIAData  = nullptr;
-			MEDIAData = (ThreadSendData *)malloc(sizeof(ThreadSendData) + data->capacity);
-			MEDIAData->type = data->type;
-			MEDIAData->dataSize = data->dataSize;
-			MEDIAData->time = data->time;
-			MEDIAData->capacity = data->capacity;
-			memcpy(MEDIAData->data, data->data, data->capacity);
-	
+            //需要将数据发送出去	
             if (data->type == TYPE_MEDIA_AUDIODATA) {
-				printf("receive aac data size = %d\n",data->dataSize);
+				//printf("receive aac data size = %d\n",data->dataSize);
+				
                 if (bufferAudio && lenBufAudio >= data->dataSize) {
                     //ALOGI("HQ  recv TYPE_MEDIA_AUDIODATA ...dataSize=%d", packageData->dataSize);
                     memcpy(bufferAudio, data->data, data->dataSize);
@@ -743,13 +644,32 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                 nativeInfo->JniMessageReport(this, TYPE_MEDIA_AUDIODATA, nullptr, bufferAudio,
                                              data->time,
                                              data->dataSize); 
+				bzero(bufferAudio,2 * 1024);
 
-				pthread_mutex_lock(&mutex_thread_AAC_Dec);
-				FaadAACBufferList.push_back(MEDIAData);
-				pthread_mutex_unlock(&mutex_thread_AAC_Dec);
-				AACdecevent.Signal();	
-				bzero(bufferAudio,1024);
+				if (!this->audioDecoderReady) {
+                    int cnt = 100;
+                    while (this->running && this->working && !this->audioDecoderReady &&
+                           (--cnt > 0)) {
+                        usleep(100 * 1000);
+                        ALOGI("HQ NOT audioDecoderReady ...");
+                        continue;
+                    }
+                }
+
 				
+				int ret = faaddecoder->faad_decode_frame(data->data,data->dataSize,pcmframe,&pcmsize);
+				if(ret > 0)
+				{
+					printf("decode aac error:%d\n",ret);
+				}
+				else
+				{					 
+					 if(faaddecoder->fp_pcm)
+					 {
+					 	fwrite( pcmframe,1, pcmsize,faaddecoder->fp_pcm);
+					 }
+			 		 memset(pcmframe,0,pcmsize);
+				}
             } 
 			else if (data->type == TYPE_MEDIA_VIDEODATA && this->mediaDecoderReady) {
                 if (!this->mediaDecoderReady) {
@@ -762,22 +682,24 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                     }
                 }
                // if (working) {
+               		/*
                     if (bufferVideo && lenBufVideo >= data->dataSize) {
                         memcpy(bufferVideo, data->data, data->dataSize);
                     }
                     nativeInfo->JniMessageReport(this, TYPE_MEDIA_VIDEODATA, nullptr, bufferVideo,
                                                  data->time,
                                                  data->dataSize);
-
-					pthread_mutex_lock(&mutex_thread_Mpp_H264data);
-					MppH264BufferList.push_back(MEDIAData);
-					pthread_mutex_unlock(&mutex_thread_Mpp_H264data);
-					Mppevent.Signal();
                     bzero(bufferVideo,2 * 1024 * 1024);
+					*/
                     //printf("上报反向投屏数据 size = %d\n",data->dataSize);
+					//printf("data->type=%d,data->dataSize=%d,data->capacity=%d\n",data->type,data->dataSize,data->capacity);
+					int ret = mppctx->decode_one_pkt(data->data, data->capacity);
+					if (ret < 0) {
+						printf("------------failed to MPP decode-----------\n");
+					}
                 //}
             }
-
+			
             free(data);
         }
     }
@@ -855,7 +777,6 @@ void TcpClient::ThreadDataProcessor::PutData(SocketPackageData *packageData) {
     //通知到线程触发上报
     event.Signal();
 }
-
 
 TcpClient::SendCacheManager::SendCacheManager(TcpClient *p) {
     pTcpClient = p;

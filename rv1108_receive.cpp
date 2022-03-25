@@ -2,9 +2,12 @@
 #include "socket/Tcp.h"
 #include "socket/TcpNativeInfo.h"
 #include "rv1108_receive.h"
+#include "UdpServer.h"
+
 static TcpNativeInfo tcpNativeInfo;
 static FILE *fp_H264;
 static FILE *fp_aac;
+
 
 static int fps = 0;
 static int fps_aac = 0;
@@ -44,11 +47,16 @@ static int _on_socket_received(void *UNUSED(user), TcpClient *client, int type, 
 
 int main()
 {
-	fp_H264 = fopen("/data/receive.h264","wb+");
-	fp_aac = fopen("data/receive.aac","wb+");
+	//fp_H264 = fopen("/data/receive.h264","wb+");
+	
+	UdpServer *receive_UDP = new UdpServer();
+	
+	
+	fp_aac = fopen("/data/receive.aac","wb+");
     tcpNativeInfo.SetCallback(nullptr, _on_socket_received);
 	Tcp *rv1108_receive = new Tcp(&tcpNativeInfo);
 	rv1108_receive->StartServer(6666);
+	receive_UDP->StartServer(rv1108_receive,6666);
 	while(1);
 	delete rv1108_receive;
 }

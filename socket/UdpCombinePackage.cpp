@@ -41,6 +41,8 @@ SocketPackageData *UdpCombinePackage::OnUdpSliceReceived(SocketPackageData *pack
     } else {
         //目前其他命令总是不分包，直接上报
         if (packageData->slices == 1) {
+			if(packageData->data[0]== '$' && packageData->data[1] == 16&&packageData->data[2] == 1&&packageData->data[3] == 0&&packageData->data[4]==0&&packageData->data[5]==0)
+			printf("receive Udp gb\n");
             tcpClient->DoRecvUdpMessage(packageData);
         }
     }

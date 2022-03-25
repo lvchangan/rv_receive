@@ -240,12 +240,6 @@ int Codec::decode_one_pkt(unsigned char *buf, int size) {
                         if (mDisPlay) {
 							//printf("decode_get_frame ID:%d get srcFrm %d.\n", mID, mFrmCnt++);
                             if (mFout) {
-	                             if(mFrmCnt >= 20)
-	                             {
-									fclose(mFout);
-									mFout = NULL;
-	                             }
-						
                                 	dump_mpp_frame_to_file(frame, mFout);
                             }
                         }

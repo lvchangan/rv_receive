@@ -109,7 +109,7 @@ public:
         {
             return;
         }
-        uint32_t AudioBufferSize = 1024;
+        uint32_t AudioBufferSize = 2 * 1024;
         uint8_t* AudioBuffer = new uint8_t[AudioBufferSize];
         BindBufferAudio(AudioBuffer, AudioBufferSize);
     }
@@ -281,20 +281,19 @@ private:
         ThreadDataProcessor(TcpClient *p);
 
         void Create(int sizeCollections);
-
+		 
         void Destroy();
 
         ThreadSendData *GetData();
 
         void PutData(SocketPackageData *packageData);
-
     private:
         std::list<ThreadSendData *> threadDataList;
         /**
          * threadDataList 最大的元素个数。一旦超过这个元素则将 threadDataList 清空
          * 就是说，threadDataList 中总是保存最新的数据
          */
-        int maxListCount = 15;
+        int maxListCount = 30;
         /**
          * 线程发送数据的锁，主要是对 threadDataList 锁
          */
@@ -309,10 +308,13 @@ private:
     ThreadDataProcessor mReceivedAudioProcessor;
     ThreadDataProcessor mReceivedVideoProcessor;
 
-    static void *threadReportData(void *p);
+	static void *threadReportData(void *p);
 
     void DoThreadReportData(ThreadDataProcessor *pProcessor);
 
+	
+	//ThreadDataProcessor ReceiveFaadDecAAC;
+	
     /**
  * 将Sene()到Socket中的数据先缓存起来，在单独的线程中发送
  * 避免主线程中发送造成
@@ -355,23 +357,15 @@ private:
 
     SendCacheManager sendCacheManager;
 
-	private:		
-	std::list<ThreadSendData *> MppH264BufferList; 
+	public:
+		int MppDecoderInit();
+		int AACDecoderInit();
+	private:
 	Codec *mppctx;
-	static void *threadMppdec(void *p);
-	int decoder_h264_thread();
-	 pthread_t tidMppdec = 0;
-	 Event Mppevent;
-	 pthread_mutex_t mutex_thread_Mpp_H264data;
-
-	 private:
-	 AAC2PCM *faaddecoder;
-	 std::list<ThreadSendData *> FaadAACBufferList; 
-	 static void *threadAACdec(void *p);
-	 int decoder_AAC_thread();
-	 pthread_t tidAACdec = 0;
-	 Event AACdecevent;
-	 pthread_mutex_t mutex_thread_AAC_Dec;
+	AAC2PCM *faaddecoder;
+	int pcmsize = 0;
+	unsigned char *pcmframe;
+	bool audioDecoderReady = false;
 };
 
 
