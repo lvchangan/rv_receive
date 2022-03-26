@@ -60,7 +60,7 @@ int Codec::init(MppCodingType type,
 	printf("LCA:wxh[%dx%d] display:%d\n",src_w,src_h,display);
 	char outfilename[256];
 	sprintf(outfilename,"/data/out_%d.yuv",mID);
-
+	printf("LCA outfilename = %s\n",outfilename);
     mFout = fopen(outfilename, "wb+");
     if (!mFout) {
         printf("failed to open output file.\n");

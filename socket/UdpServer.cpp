@@ -68,10 +68,28 @@ void UdpServer::doStartListen() {
         //ALOGI("AAA UDP Recv. seq=%d, type=%x, size=%d, ", packageData->seq, packageData->type,packageData->dataSize);
         //UDP通信的有界性，此处可以确保接收到的一整个分包(发送端确保不会超出BUFSISE)
 		if(buffer[0]== '$' && buffer[1] == 16&&buffer[2] == 1&&buffer[3] == 0&&buffer[4]==0&&buffer[5]==0)
-			printf("receive Udp1 gb\n");
+		{
+			//printf("receive Udp1 gb\n");
+			AnswerRadioBroadcast(cli);
+		}
         tcp->OnUdpSliceReceived(packageData, cli.sin_addr);
     }
     ALOGI("HQ UDP Server exit ....\n");
     close(sockFd);
     delete[] buffer;
 }
+
+void UdpServer::AnswerRadioBroadcast(struct sockaddr_in cli)
+{
+	int offset = 0;
+	char answerdata[256];
+	answerdata[offset++] = '$';
+	answerdata[offset++] = 0x11;
+	char devicemessage[125] = "RV1108_receive&B0:C5:CA:75:8E:ED";
+	int len = strlen(devicemessage);
+	answerdata[offset++] = len;
+	memcpy(answerdata+offset,devicemessage,len);
+
+	sendto(fd_socket,answerdata,strlen(answerdata),0,(struct sockaddr *) &cli,sizeof(cli));
+}
+

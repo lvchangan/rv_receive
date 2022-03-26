@@ -17,6 +17,7 @@ public:
 
     bool StopServer();
 
+	void AnswerRadioBroadcast(struct sockaddr_in cli);
 private:
     Tcp *tcp;
     int fd_socket = 0;

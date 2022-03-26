@@ -112,7 +112,6 @@ int Tcp::doStartListen() {
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (clients[i] == nullptr) {
                 TcpClient *client = new TcpClient(nativeInfo, this, fd, &addrClient);
-				client->clientID = i;
                 clients[i] = client;
                 break;
             }

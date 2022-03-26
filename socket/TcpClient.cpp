@@ -8,12 +8,13 @@
 #include "TcpNativeInfo.h"
 #include "Locker.h"
 
+static int i = 0;
 /**
  * Tcp Server检测到一个Client连接时，创建 TcpClient 实例
  */
 TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockaddr_in *addr)
         : seq(0), tcp(tcp), mReceivedAudioProcessor(this), mReceivedVideoProcessor(this),
-          sendCacheManager(this){
+          sendCacheManager(this),clientID(i++){
     this->nativeInfo = nativeInfo;
     this->running = true;
     this->fd_socket = fd;
@@ -34,7 +35,7 @@ TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockadd
     mUdpCombinePackage = new UdpCombinePackage(this);
     CreateBufferVideo();
 	CreateBufferAudio();
-
+	printf("clientID = %d,fd_socket = %d\n",clientID,fd_socket);
 	MppDecoderInit();
 	AACDecoderInit();
 	//pthread_t aac_tid;
@@ -53,7 +54,7 @@ int TcpClient::MppDecoderInit()
 	}
 	else
 	{
-		this->mediaDecoderReady = false;
+		this->mediaDecoderReady = true;
 	}
 	return 0;
 }
@@ -80,7 +81,7 @@ int TcpClient::AACDecoderInit()
  */
 TcpClient::TcpClient(TcpNativeInfo *nativeInfo)
         : seq(0), tcp(nullptr), mReceivedAudioProcessor(this), mReceivedVideoProcessor(this),
-          sendCacheManager(this) {
+          sendCacheManager(this),clientID(i++) {
     this->nativeInfo = nativeInfo;
     this->running = false;
     fd_socket = 0;
@@ -478,7 +479,7 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
             }
             break;
         case TYPE_MEDIA_AUDIODATA:
-			printf("HQ  recv TYPE_MEDIA_AUDIOATA ... lenBufAudio = %d dataSize=%d\n",lenBufAudio, packageData->dataSize);
+			//printf("HQ  recv TYPE_MEDIA_AUDIOATA ... lenBufAudio = %d dataSize=%d\n",lenBufAudio, packageData->dataSize);
             if (bufferAudio && lenBufAudio >= (int) packageData->dataSize) {
                 mReceivedAudioProcessor.PutData(packageData);
             }
@@ -636,7 +637,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
             //需要将数据发送出去	
             if (data->type == TYPE_MEDIA_AUDIODATA) {
 				//printf("receive aac data size = %d\n",data->dataSize);
-				
+				/*
                 if (bufferAudio && lenBufAudio >= data->dataSize) {
                     //ALOGI("HQ  recv TYPE_MEDIA_AUDIODATA ...dataSize=%d", packageData->dataSize);
                     memcpy(bufferAudio, data->data, data->dataSize);
@@ -645,6 +646,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                                              data->time,
                                              data->dataSize); 
 				bzero(bufferAudio,2 * 1024);
+				*/
 
 				if (!this->audioDecoderReady) {
                     int cnt = 100;
@@ -655,8 +657,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                         continue;
                     }
                 }
-
-				
+					
 				int ret = faaddecoder->faad_decode_frame(data->data,data->dataSize,pcmframe,&pcmsize);
 				if(ret > 0)
 				{
@@ -671,7 +672,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
 			 		 memset(pcmframe,0,pcmsize);
 				}
             } 
-			else if (data->type == TYPE_MEDIA_VIDEODATA && this->mediaDecoderReady) {
+			else if (data->type == TYPE_MEDIA_VIDEODATA) {
                 if (!this->mediaDecoderReady) {
                     int cnt = 100;
                     while (this->running && this->working && !this->mediaDecoderReady &&
@@ -751,7 +752,8 @@ TcpClient::ThreadSendData *TcpClient::ThreadDataProcessor::GetData() {
 }
 
 void TcpClient::ThreadDataProcessor::PutData(SocketPackageData *packageData) {
-    bool full = threadDataList.size() >= maxListCount;
+    //bool full = threadDataList.size() >= maxListCount;
+    bool full = false;
     if (full) {
         //数据满了，不能加入到
         if (packageData->type == TYPE_MEDIA_VIDEODATA) {
