@@ -8,13 +8,15 @@
 #include "TcpNativeInfo.h"
 #include "Locker.h"
 
-static int i = 0;
+FILE * TcpClient::mFYUVout = NULL;
+unsigned char * TcpClient::YUVSplicingBuffer = NULL;
+
 /**
  * Tcp Server检测到一个Client连接时，创建 TcpClient 实例
  */
 TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockaddr_in *addr)
         : seq(0), tcp(tcp), mReceivedAudioProcessor(this), mReceivedVideoProcessor(this),
-          sendCacheManager(this),clientID(i++){
+          sendCacheManager(this){
     this->nativeInfo = nativeInfo;
     this->running = true;
     this->fd_socket = fd;
@@ -35,7 +37,7 @@ TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockadd
     mUdpCombinePackage = new UdpCombinePackage(this);
     CreateBufferVideo();
 	CreateBufferAudio();
-	printf("clientID = %d,fd_socket = %d\n",clientID,fd_socket);
+	printf("Clientnum = %d,clientID = %d,fd_socket = %d\n",tcp->Clientnum,tcp->ClientId,fd_socket);
 	MppDecoderInit();
 	AACDecoderInit();
 	//pthread_t aac_tid;
@@ -45,8 +47,9 @@ TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockadd
 int TcpClient::MppDecoderInit()
 {
 	int ret = 0;
-	mppctx = new Codec();
-	mppctx->mID = this->clientID;
+	mppctx = new Codec(this);
+	mppctx->mID = tcp->ClientId;
+	mppctx->mNum = tcp->Clientnum;
 	ret = mppctx->init(MPP_VIDEO_CodingAVC,1920,1080, 1);
 	if (ret < 0) {
 		printf("LCA: failed to init mpp\n");
@@ -81,7 +84,7 @@ int TcpClient::AACDecoderInit()
  */
 TcpClient::TcpClient(TcpNativeInfo *nativeInfo)
         : seq(0), tcp(nullptr), mReceivedAudioProcessor(this), mReceivedVideoProcessor(this),
-          sendCacheManager(this),clientID(i++) {
+          sendCacheManager(this) {
     this->nativeInfo = nativeInfo;
     this->running = false;
     fd_socket = 0;
@@ -97,7 +100,7 @@ TcpClient::~TcpClient() {
         delete mUdpCombinePackage;
         mUdpCombinePackage = nullptr;
     }
-    nativeInfo = nullptr;
+    nativeInfo = nullptr;	
     pthread_mutex_destroy(&mutex_write);
 }
 
@@ -130,12 +133,24 @@ void TcpClient::Release(bool selfDis) {
 		delete faaddecoder;
 		faaddecoder = nullptr;
 	}
+	if(YUVSplicingBuffer && tcp->Clientnum == 1)
+	{
+		free(YUVSplicingBuffer);
+		YUVSplicingBuffer == NULL;
+	}
+	if(mFYUVout && tcp->Clientnum == 1)
+	{
+		fclose(mFYUVout);
+		printf("fclose YUV file\n");
+        mFYUVout = NULL;
+	}
 	if(pcmframe)
 		free(pcmframe);
     mReceivedAudioProcessor.Destroy();
     mReceivedVideoProcessor.Destroy();
     sendCacheManager.Destroy();
     pthread_mutex_unlock(&mutex_write);
+	tcp->Clientnum--;
 }
 
 
@@ -257,6 +272,7 @@ int TcpClient::Send(int type, void *data, int len) {
     if (!running || fd_socket <= 0) {
         return -1;
     }
+	//printf("Send type = 0x%x\n",type);
     //如果支持UDP，则音视频数据通过UDP发送
     if (udpClient && udpSupportType) {
         int useUdp = 0;

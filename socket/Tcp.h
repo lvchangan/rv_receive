@@ -47,6 +47,10 @@ public:
 
     void OnUdpSliceReceived(SocketPackageData *packageData, struct in_addr addr);
 
+	
+	int Clientnum;
+	
+	int ClientId;
 private:
     TcpNativeInfo *nativeInfo;
 
@@ -78,7 +82,6 @@ private:
     int doStartListen();
 
     void FreeClient(int addr);
-
 };
 
 

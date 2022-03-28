@@ -1,12 +1,12 @@
 //
 // Created by root on 17-11-1.
 //
-
+#include "TcpClient.h"
 #include "mpp_decoder_h264.h"
 
 using namespace std;
 
-Codec::Codec() : 
+Codec::Codec(TcpClient *TcpClient) : 
 				 mFps(0),
                  mEos(0),
                  mID(0),
@@ -16,9 +16,10 @@ Codec::Codec() :
                  mFout(NULL),
                  mCtx(NULL),
                  mApi(NULL),
-                 mFrmGrp(NULL)
+                 mFrmGrp(NULL),
+                 pTcpClient(TcpClient)
 {
-
+	
 }
 
 Codec::~Codec() {
@@ -56,8 +57,12 @@ int Codec::init(MppCodingType type,
     mDisPlay = display;
     srcW = src_w;
     srcH = src_h;
-	
+	srcYsize = src_w * src_h;
+	srcYUVsize = src_w * src_h *1.5;
+		
 	printf("LCA:wxh[%dx%d] display:%d\n",src_w,src_h,display);
+
+	/*
 	char outfilename[256];
 	sprintf(outfilename,"/data/out_%d.yuv",mID);
 	printf("LCA outfilename = %s\n",outfilename);
@@ -66,7 +71,19 @@ int Codec::init(MppCodingType type,
         printf("failed to open output file.\n");
         return -1;
     }
-	
+	*/
+	if(!pTcpClient->mFYUVout)
+	{
+		pTcpClient->mFYUVout = fopen("YUVSpl.yuv", "wb+");
+	    if (!pTcpClient->mFYUVout) {
+	        printf("failed to open output file.\n");
+	        return -1;
+	    }
+		else 
+		{
+			printf("LCA open YUVSpling file success.\n");
+		}
+	}
 	// 初始化解码器上下文，MppCtx MppApi
     ret = mpp_create(&mCtx, &mApi);
     if (ret != MPP_OK) {
@@ -94,6 +111,11 @@ int Codec::init(MppCodingType type,
     int ver_srride = CODEC_ALIGN(srcH, 16);
 	printf("hor_stride x ver_srride [%d x %d]\n",hor_stride,ver_srride);
 	mpp_buffer_get(mFrmGrp, &mBuffer, hor_stride * ver_srride * 3 / 2);
+
+	if(pTcpClient->YUVSplicingBuffer == NULL)
+	{
+		pTcpClient->YUVSplicingBuffer = (unsigned char *)malloc(two_ResYUVSize);
+	}
 	
     return 0;
 }
@@ -104,6 +126,16 @@ static RK_S64 get_time() {
     return (RK_S64)tv_date.tv_sec * 1000000 + (RK_S64)tv_date.tv_usec;
 }
 
+void Codec::ReadYUV(unsigned char* ResBuf,unsigned char* PreBuf, int resstart, int prestart, int resoffset, int preoffset, int size, int height)
+{
+	int k;
+	for (k = 0; k < height; k++)
+	{
+		memmove(ResBuf + resstart + k * (resoffset), PreBuf + prestart + k * (preoffset), size);//注意这里用memmov不用strncpy
+	}
+}
+
+
 int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
 {
     RK_U32 width = 0;
@@ -113,10 +145,10 @@ int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
     MppFrameFormat fmt = MPP_FMT_YUV420P;
     MppBuffer buffer = NULL;
     RK_U8 *base = NULL;
-
+	/*
     if (!fp || !frame)
         return -1;
-
+	*/
     width = mpp_frame_get_width(frame);
     height = mpp_frame_get_height(frame);
     h_stride = mpp_frame_get_hor_stride(frame);
@@ -131,6 +163,42 @@ int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
     }
 
     base = (RK_U8 *)mpp_buffer_get_ptr(buffer);
+
+	int Y_start_section = 0;/*预处理图片Y分量存入目标区域的起始区域*/
+	int UV_start_section = 0;
+
+	int File_offset = 0;/*预处理文件偏移值*/
+	int i_combine = 0, j_combine = 0, k_combine = 0;/*控制循环*/
+
+	if(mID == 0)
+	{
+		Y_start_section = 0;
+		UV_start_section = two_ResYSize;
+	}
+	else if(mID == 1)
+	{
+		Y_start_section = srcW;
+		UV_start_section = two_ResYSize + srcW;
+	}
+	else if(mID == 2)
+	{
+
+
+	}
+	else if(mID == 3)
+	{
+
+
+	}
+	
+	if(pTcpClient->mFYUVout && pTcpClient->YUVSplicingBuffer)
+	{
+		ReadYUV(pTcpClient->YUVSplicingBuffer, base , Y_start_section, 0, 2 * srcW, h_stride, srcW, srcH);
+		ReadYUV(pTcpClient->YUVSplicingBuffer, base , UV_start_section,h_stride*v_stride, 2 * srcW, h_stride, srcW, srcH/2);
+		fwrite(pTcpClient->YUVSplicingBuffer,1,two_ResYUVSize,pTcpClient->mFYUVout);
+	}
+	
+	/*
     {
         RK_U32 i;
         RK_U8 *base_y = base;
@@ -141,7 +209,7 @@ int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
         for (i = 0; i < height / 2; i++, base_uv += h_stride)
  			fwrite(base_uv, 1, width, fp);
     }
-
+	*/
     return 0;
 }
 
@@ -239,9 +307,9 @@ int Codec::decode_one_pkt(unsigned char *buf, int size) {
 
                         if (mDisPlay) {
 							//printf("decode_get_frame ID:%d get srcFrm %d.\n", mID, mFrmCnt++);
-                            if (mFout) {
+                            //if (mFout) {
                                 	dump_mpp_frame_to_file(frame, mFout);
-                            }
+                            //}
                         }
                 }	
                 frm_eos = mpp_frame_get_eos(frame);

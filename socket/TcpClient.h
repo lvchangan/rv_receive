@@ -43,14 +43,11 @@ class TcpClient {
      */
     const int RINGBUFFER_SIZE = 4 * 1024 * 1024;
 public:
-	int clientID;
     TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockaddr_in *addr);
 
     TcpClient(TcpNativeInfo *nativeInfo);
 
     ~TcpClient();
-
-	void SendRequestQuality();
 	
     TcpNativeInfo *GetModule() {
         return this->nativeInfo;
@@ -155,6 +152,7 @@ public:
         return sendCmdCache;
     }
 
+	Tcp *tcp;
 private:
     /**
      * 发送包的序号
@@ -162,7 +160,7 @@ private:
     uint32_t seq;
     TcpNativeInfo *nativeInfo;
     bool running;
-    const Tcp *tcp;
+    //const Tcp *tcp;
     int fd_socket;
     struct sockaddr_in addr;
     /**
@@ -360,6 +358,10 @@ private:
 	public:
 		int MppDecoderInit();
 		int AACDecoderInit();
+		void SendRequestQuality();
+		static FILE* mFYUVout;
+	
+		static unsigned char *YUVSplicingBuffer;
 	private:
 	Codec *mppctx;
 	AAC2PCM *faaddecoder;
