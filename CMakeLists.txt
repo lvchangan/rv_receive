@@ -32,6 +32,10 @@ add_definitions(-DLINUX -DSUPPORT_ION -DENABLE_ASSERT)
 
 add_executable(rv1108_receive ${RV1108_RECEIVE_LIST})
 
+
+
+#target_link_libraries(rv1108_receive ${CMAKE_CURRENT_SOURCE_DIR}/faad/libfaad.so)
+
 target_link_libraries(rv1108_receive
     z 
     c 

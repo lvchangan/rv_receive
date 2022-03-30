@@ -23,7 +23,8 @@ Codec::Codec(TcpClient *TcpClient) :
 }
 
 Codec::~Codec() {
-
+	deinit();
+	
     if (mCtx) {
         mpp_destroy(mCtx);
         mCtx = NULL;
@@ -55,35 +56,25 @@ int Codec::init(MppCodingType type,
     MppParam param = NULL;
 	
     mDisPlay = display;
+	/*
     srcW = src_w;
     srcH = src_h;
 	srcYsize = src_w * src_h;
 	srcYUVsize = src_w * src_h *1.5;
 		
 	printf("LCA:wxh[%dx%d] display:%d\n",src_w,src_h,display);
-
-	/*
+	
 	char outfilename[256];
-	sprintf(outfilename,"/data/out_%d.yuv",mID);
-	printf("LCA outfilename = %s\n",outfilename);
+	sprintf(outfilename,"/data/yuv_%d_1920x1080.yuv",mID);
+	filewidth = 1920;
+	//printf("LCA outfilename = %s\n",outfilename);
     mFout = fopen(outfilename, "wb+");
     if (!mFout) {
         printf("failed to open output file.\n");
         return -1;
     }
 	*/
-	if(!pTcpClient->mFYUVout)
-	{
-		pTcpClient->mFYUVout = fopen("YUVSpl.yuv", "wb+");
-	    if (!pTcpClient->mFYUVout) {
-	        printf("failed to open output file.\n");
-	        return -1;
-	    }
-		else 
-		{
-			printf("LCA open YUVSpling file success.\n");
-		}
-	}
+	
 	// 初始化解码器上下文，MppCtx MppApi
     ret = mpp_create(&mCtx, &mApi);
     if (ret != MPP_OK) {
@@ -111,13 +102,62 @@ int Codec::init(MppCodingType type,
     int ver_srride = CODEC_ALIGN(srcH, 16);
 	printf("hor_stride x ver_srride [%d x %d]\n",hor_stride,ver_srride);
 	mpp_buffer_get(mFrmGrp, &mBuffer, hor_stride * ver_srride * 3 / 2);
-
-	if(pTcpClient->YUVSplicingBuffer == NULL)
-	{
-		pTcpClient->YUVSplicingBuffer = (unsigned char *)malloc(two_ResYUVSize);
-	}
 	
     return 0;
+}
+
+int Codec::ResetYUVSplicingBuffer(int codecnum)
+{
+	pthread_mutex_lock(&mutex_YUVSplicing);	
+		
+	if(pTcpClient->mFYUVout)
+	{
+		fclose(pTcpClient->mFYUVout);
+		pTcpClient->mFYUVout = NULL;
+	}
+	
+	if(codecnum == 1)
+	{
+		pTcpClient->YUVSplicingBufferSize = one_ResYUVSize;
+		pTcpClient->mFYUVout = fopen("/data/YUVSpl_1920x1080.yuv", "wb+");
+	}
+	else if(codecnum == 2)
+	{
+		pTcpClient->YUVSplicingBufferSize = two_ResYUVSize;
+		pTcpClient->mFYUVout = fopen("/data/YUVSpl_3200x900.yuv", "wb+");
+	}
+	else if(codecnum == 3)
+	{
+		pTcpClient->YUVSplicingBufferSize = three_ResYUVSize;
+		pTcpClient->mFYUVout = fopen("/data/YUVSpl_3200x1800.yuv", "wb+");
+	}
+	else if(codecnum == 4)
+	{
+		pTcpClient->YUVSplicingBufferSize = four_ResYUVSize;
+		pTcpClient->mFYUVout = fopen("/data/YUVSpl_2732x1536.yuv", "wb+");
+	}
+
+    if (!pTcpClient->mFYUVout) {
+        printf("failed to open output file.\n");
+        return -1;
+    }
+	else 
+	{
+		printf("LCA open YUVSpling file success.%d\n",codecnum);
+	}
+	
+	if(pTcpClient->YUVSplicingBuffer)
+	 free(pTcpClient->YUVSplicingBuffer);
+	
+	pTcpClient->YUVSplicingBuffer = (unsigned char *)malloc(pTcpClient->YUVSplicingBufferSize);
+	if(!pTcpClient->YUVSplicingBuffer)
+	{
+		printf("YUVSplicingBuffer malloc error\n");
+        return -2;
+	}
+	pthread_mutex_unlock(&mutex_YUVSplicing);
+	printf("YUVSplicingBuffer malloc success\n");
+	return 0;
 }
 
 static RK_S64 get_time() {
@@ -155,7 +195,6 @@ int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
     v_stride = mpp_frame_get_ver_stride(frame);
     fmt = mpp_frame_get_fmt(frame);
     buffer = mpp_frame_get_buffer(frame);
-	//printf("LCA:write file wxh[%dx%d],hxv[%dx%d],fmt:0x%x\n",width,height,h_stride,v_stride,fmt);
     if(!buffer)
     {
     	printf("write error\n");
@@ -164,50 +203,112 @@ int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
 
     base = (RK_U8 *)mpp_buffer_get_ptr(buffer);
 
-	int Y_start_section = 0;/*预处理图片Y分量存入目标区域的起始区域*/
+	int Y_start_section = 0;  //预处理图片Y分量存入目标区域的起始区域
 	int UV_start_section = 0;
-
-	int File_offset = 0;/*预处理文件偏移值*/
-	int i_combine = 0, j_combine = 0, k_combine = 0;/*控制循环*/
-
-	if(mID == 0)
+	int resoffset =  2 * width;
+	
+	if(mNum == 1)
 	{
-		Y_start_section = 0;
-		UV_start_section = two_ResYSize;
+		resoffset = width;
+		if(mID == 0)
+		{
+			Y_start_section = 0;
+			UV_start_section = one_ResYSize;
+		}
 	}
-	else if(mID == 1)
+	else if(mNum == 2)
 	{
-		Y_start_section = srcW;
-		UV_start_section = two_ResYSize + srcW;
+		if(mID == 0)
+		{
+			Y_start_section = 0;
+			UV_start_section = two_ResYSize;
+		}
+		else if(mID == 1)
+		{
+			Y_start_section = width;
+			UV_start_section = two_ResYSize + width;
+		}
 	}
-	else if(mID == 2)
+	else if(mNum == 3)
 	{
-
-
+		if(mID == 0)
+		{
+			Y_start_section = 0;
+			UV_start_section = three_ResYSize;
+		}
+		else if(mID == 1)
+		{
+			Y_start_section = width;
+			UV_start_section = three_ResYSize + width;
+		}
+		else if(mID == 2)
+		{
+			Y_start_section = two_ResYUVSize;
+			UV_start_section = two_ResYUVSize + three_ResYSize;
+		}
 	}
-	else if(mID == 3)
+	else if(mID == 4)
 	{
-
-
+		if(mID == 0)
+		{
+			Y_start_section = 0;
+			UV_start_section = four_two_ResYSize;
+		}
+		else if(mID == 1)
+		{
+			Y_start_section = width;
+			UV_start_section = four_two_ResYSize + width;
+		}
+		else if(mID == 2)
+		{
+			Y_start_section = four_two_ResYUVSize;
+			UV_start_section = four_two_ResYUVSize + four_two_ResYSize;
+		}
+		else if(mID == 3)
+		{
+			Y_start_section = four_two_ResYUVSize + width;
+			UV_start_section = four_two_ResYUVSize + four_two_ResYSize + width;
+		}
 	}
+	
 	
 	if(pTcpClient->mFYUVout && pTcpClient->YUVSplicingBuffer)
 	{
-		ReadYUV(pTcpClient->YUVSplicingBuffer, base , Y_start_section, 0, 2 * srcW, h_stride, srcW, srcH);
-		ReadYUV(pTcpClient->YUVSplicingBuffer, base , UV_start_section,h_stride*v_stride, 2 * srcW, h_stride, srcW, srcH/2);
-		fwrite(pTcpClient->YUVSplicingBuffer,1,two_ResYUVSize,pTcpClient->mFYUVout);
+		printf("LCA:write file wxh[%dx%d],hxv[%dx%d],fmt:0x%x Y:%d UV:%d\n",width,height,h_stride,v_stride,fmt,Y_start_section,UV_start_section);
+		pthread_mutex_lock(&mutex_YUVSplicing);
+		if((mNum <= 2)&&(pTcpClient->YUVSplicingBufferSize == width*height*1.5*mNum)||(mNum > 2)&&(pTcpClient->YUVSplicingBufferSize == width*height*1.5*4))
+		{
+			ReadYUV(pTcpClient->YUVSplicingBuffer, base , Y_start_section, 0, resoffset, h_stride, width, height);
+			ReadYUV(pTcpClient->YUVSplicingBuffer, base , UV_start_section,h_stride*v_stride, resoffset, h_stride, width, height/2);
+			fwrite(pTcpClient->YUVSplicingBuffer,1,pTcpClient->YUVSplicingBufferSize,pTcpClient->mFYUVout);
+		}
+		pthread_mutex_unlock(&mutex_YUVSplicing);
 	}
 	
+	
 	/*
+	if(width == 1600 && filewidth != width)
+	{
+		if(mFout)
+		{
+			fclose(mFout);
+			char outfilename[256];
+			sprintf(outfilename,"/data/yuv_%d_1600x900.yuv",mID);
+			filewidth = 1600;
+    		mFout = fopen(outfilename, "wb+");
+		}
+	}
+	
+	printf("LCA:write file wxh[%dx%d],hxv[%dx%d],fmt:0x%x\n",width,height,h_stride,v_stride,fmt);
     {
         RK_U32 i;
         RK_U8 *base_y = base;
         RK_U8 *base_uv = base + h_stride * v_stride;
 
         for (i = 0; i < height; i++, base_y += h_stride)
-            fwrite(base_y, 1, width, fp);
+            fwrite(base_y, 1, width, mFout);
         for (i = 0; i < height / 2; i++, base_uv += h_stride)
- 			fwrite(base_uv, 1, width, fp);
+ 			fwrite(base_uv, 1, width, mFout);
     }
 	*/
     return 0;
@@ -265,8 +366,7 @@ int Codec::decode_one_pkt(unsigned char *buf, int size) {
                     RK_U32 buf_size = mpp_frame_get_buf_size(frame);
 
                     printf("decode_get_frame get info changed found\n");
-                    printf("decoder require buffer w:h [%d:%d] stride [%d:%d] buf_size %d",
-                            width, height, hor_stride, ver_stride, buf_size);
+                    printf("decoder require buffer w:h [%d:%d] stride [%d:%d] buf_size %d\n",width, height, hor_stride, ver_stride, buf_size);
 
 					if (NULL == mFrmGrp) {
 						 /* If buffer group is not set create one and limit it */

@@ -282,6 +282,8 @@ private:
 		 
         void Destroy();
 
+		void FreeList();
+		
         ThreadSendData *GetData();
 
         void PutData(SocketPackageData *packageData);
@@ -324,7 +326,7 @@ private:
         void Create();
 
         void Destroy();
-
+			
         SendCacheManager(TcpClient *p);
 
         ~SendCacheManager();
@@ -359,9 +361,12 @@ private:
 		int MppDecoderInit();
 		int AACDecoderInit();
 		void SendRequestQuality();
+		void ResetDecoderCtx(int clientplayernum);
 		static FILE* mFYUVout;
 	
 		static unsigned char *YUVSplicingBuffer;
+
+		static int YUVSplicingBufferSize;
 	private:
 	Codec *mppctx;
 	AAC2PCM *faaddecoder;

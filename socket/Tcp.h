@@ -51,6 +51,8 @@ public:
 	int Clientnum;
 	
 	int ClientId;
+
+	int ClientPlayernum;
 private:
     TcpNativeInfo *nativeInfo;
 

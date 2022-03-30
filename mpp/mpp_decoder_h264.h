@@ -32,9 +32,23 @@
 #define PKT_SIZE    SZ_4K
 #define CODEC_ALIGN(x, a)   (((x)+(a)-1)&~((a)-1))
 
+#define one_ResYSize  (1920*1080)
+#define one_ResYUVSize (1920*1080*1.5)
 
-#define two_ResYSize  (3840*1080)
-#define two_ResYUVSize (3840*1080*1.5)
+#define two_ResYSize  (3200*900)
+#define two_ResYUVSize (3200*900*1.5)
+
+
+#define three_ResYSize  (3200*900)
+#define three_ResYUVSize (3200*1080*1.5)
+
+
+#define four_two_ResYSize  (2732*768)
+#define four_two_ResYUVSize (2732*768*1.5)
+
+#define four_ResYUVSize (2732*1536*1.5)
+
+static pthread_mutex_t mutex_YUVSplicing = PTHREAD_MUTEX_INITIALIZER;
 
 class Codec {
 public:
@@ -49,23 +63,27 @@ public:
     double get_frm_rate() {
         return mFrmRate;
     }
+	int ResetYUVSplicingBuffer(int codecnum);
 	int mEos;
 	int mID;
 	int mNum;
-private:
-    int mFps;   
-    int mDisPlay;
-    
-    int srcW;	//解码的宽度
+	
+	int srcW;	//解码的宽度
     int srcH;	//解码的高度
     int srcYsize;
     int srcYUVsize;
-
+private:
+    int mFps;   
+    int mDisPlay;
+    	
     RK_S64 mTimeS;
     RK_S64 mTimeE;
     RK_S64 mTimeDiff;
     double mFrmRate;
 
+	int filewidth;
+
+	
     int mFrmCnt;	//解码帧数
     FILE *mFout;
     MppCtx mCtx;
@@ -74,8 +92,6 @@ private:
     MppBufferGroup mFrmGrp;
 	
 public:
-	pthread_mutex_t mutex_YUVSplicing;
-	
 	TcpClient *pTcpClient;
 };
 	

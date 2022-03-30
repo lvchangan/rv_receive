@@ -10,6 +10,7 @@
 
 FILE * TcpClient::mFYUVout = NULL;
 unsigned char * TcpClient::YUVSplicingBuffer = NULL;
+int TcpClient::YUVSplicingBufferSize=0;
 
 /**
  * Tcp Server检测到一个Client连接时，创建 TcpClient 实例
@@ -24,7 +25,6 @@ TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockadd
     struct timeval timeout = {3, 0};
     setsockopt(fd_socket, SOL_SOCKET, SO_SNDTIMEO, (char *) &timeout, sizeof(struct timeval));
     pthread_mutex_init(&mutex_write, NULL);
-	
     memcpy(&this->addr, addr, sizeof(this->addr));
     //const char *ip = inet_ntoa(this->addr.sin_addr);
     mHeartbeatFlags = HBFLAG_CLIENTINFO;
@@ -49,15 +49,10 @@ int TcpClient::MppDecoderInit()
 	int ret = 0;
 	mppctx = new Codec(this);
 	mppctx->mID = tcp->ClientId;
-	mppctx->mNum = tcp->Clientnum;
 	ret = mppctx->init(MPP_VIDEO_CodingAVC,1920,1080, 1);
 	if (ret < 0) {
 		printf("LCA: failed to init mpp\n");
 		return -1;
-	}
-	else
-	{
-		this->mediaDecoderReady = true;
 	}
 	return 0;
 }
@@ -136,13 +131,17 @@ void TcpClient::Release(bool selfDis) {
 	if(YUVSplicingBuffer && tcp->Clientnum == 1)
 	{
 		free(YUVSplicingBuffer);
-		YUVSplicingBuffer == NULL;
+		YUVSplicingBuffer = NULL;
 	}
-	if(mFYUVout && tcp->Clientnum == 1)
+	if(mFYUVout && tcp->ClientPlayernum == 1)
 	{
 		fclose(mFYUVout);
 		printf("fclose YUV file\n");
         mFYUVout = NULL;
+	}
+	if(tcp->Clientnum == 1)
+	{
+		pthread_mutex_destroy(&mutex_YUVSplicing);
 	}
 	if(pcmframe)
 		free(pcmframe);
@@ -157,9 +156,38 @@ void TcpClient::Release(bool selfDis) {
 void TcpClient::SendRequestQuality() {
 	RequestQuality requestQuality = { 0 };
 	requestQuality.version = sizeof(RequestQuality);
-	requestQuality.width = 1920;
-	requestQuality.height = 1080;
-	requestQuality.quality = 0;
+	if(tcp->ClientPlayernum == 1)
+	{
+		requestQuality.quality = 5;
+		requestQuality.width = 1920;
+		requestQuality.height = 1080;
+	}
+	else if(tcp->ClientPlayernum == 2)
+	{
+		requestQuality.quality = 4;
+		requestQuality.width = 1600;
+		requestQuality.height = 900;
+	}
+	else if(tcp->ClientPlayernum == 3)
+	{
+		requestQuality.quality = 3;
+		requestQuality.width = 1600;
+		requestQuality.height = 900;
+	}
+	else if(tcp->ClientPlayernum == 4)
+	{
+		requestQuality.quality = 2;
+		requestQuality.width = 1366;
+		requestQuality.height = 768;
+	}
+	else
+	{
+		requestQuality.quality = 0;
+	}
+	mppctx->srcW =requestQuality.width;
+	mppctx->srcH =requestQuality.height;
+	printf("LCA QUALITY wxh[%d x %d] clientID %d\n",mppctx->srcW,mppctx->srcH,mppctx->mID);
+	//requestQuality.quality = 0;
 	requestQuality.video_fps = 0;
 	Send(TYPE_REQUEST_QUALITY, &requestQuality, sizeof(requestQuality));
 }
@@ -573,11 +601,22 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
             //检测到开始，清空数据
             sendCacheManager.ClearAudioData();
             sendCacheManager.ClearVideoData();
+			if(!working)
+			{
+				tcp->ClientPlayernum++;
+				mppctx->mNum = tcp->ClientPlayernum;
+				printf("ClientPlayernum = %d\n",tcp->ClientPlayernum);
+				SendRequestQuality();
+				
+			}
+			//mediaDecoderReady = true;
+			ResetDecoderCtx(tcp->ClientPlayernum);
             working = true;
-			SendRequestQuality();
             //report = true;
             break;
         case TYPE_MIRROR_STOP:
+			tcp->ClientPlayernum--;
+			printf("ClientPlayernum = %d\n",tcp->ClientPlayernum);
             StopCtrl();
             report = true;
             break;
@@ -594,6 +633,31 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
     }
 }
 
+void TcpClient::ResetDecoderCtx(int clientplayernum)
+{
+	if(clientplayernum == 1 && YUVSplicingBufferSize ==one_ResYUVSize)
+	{
+		mediaDecoderReady = true;
+		return;
+	}
+	else if(clientplayernum == 2 && YUVSplicingBufferSize ==two_ResYUVSize)
+	{
+		mediaDecoderReady = true;
+		return;
+	}
+	else if(clientplayernum == 3 && YUVSplicingBufferSize ==three_ResYUVSize)
+	{
+		mediaDecoderReady = true;
+		return;
+	}
+	else if(clientplayernum == 4 && YUVSplicingBufferSize ==four_ResYUVSize)
+	{
+		mediaDecoderReady = true;
+		return;
+	}
+	mppctx->ResetYUVSplicingBuffer(clientplayernum);
+	mediaDecoderReady = true;
+}
 /**
  * 定期发送心跳到Server
  * 只有Client才会启用，在 {@link #Connect}中自动创建线程
@@ -647,7 +711,18 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
         if (!running) {
             break;
         }
-
+		if(working)
+		{
+			if(mppctx->mNum != tcp->ClientPlayernum)
+			{
+				mediaDecoderReady = false;
+				SendRequestQuality();
+				mppctx->mNum = tcp->ClientPlayernum;
+				printf("LCA start free list\n");
+				pProcessor->FreeList();
+				ResetDecoderCtx(mppctx->mNum);
+			}
+		}
         ThreadSendData *data = pProcessor->GetData();
         if (data != nullptr) {
             //需要将数据发送出去	
@@ -716,7 +791,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
 					}
                 //}
             }
-			
+			if(data)
             free(data);
         }
     }
@@ -745,6 +820,12 @@ void TcpClient::ThreadDataProcessor::Destroy() {
         pthread_mutex_unlock(&mutex_thread_data);
         pthread_mutex_destroy(&mutex_thread_data);
     }
+}
+
+void TcpClient::ThreadDataProcessor::FreeList() {
+	    pthread_mutex_lock(&mutex_thread_data);
+        threadDataList.clear();
+        pthread_mutex_unlock(&mutex_thread_data);
 }
 
 /**
