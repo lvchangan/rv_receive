@@ -9,8 +9,8 @@
 #include "Locker.h"
 
 FILE * TcpClient::mFYUVout = NULL;
-unsigned char * TcpClient::YUVSplicingBuffer = NULL;
-int TcpClient::YUVSplicingBufferSize=0;
+/*unsigned char * TcpClient::YUVSplicingBuffer = NULL;
+int TcpClient::YUVSplicingBufferSize=0;*/
 
 /**
  * Tcp Server检测到一个Client连接时，创建 TcpClient 实例
@@ -40,13 +40,17 @@ TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockadd
 	printf("Clientnum = %d,clientID = %d,fd_socket = %d\n",tcp->Clientnum,tcp->ClientId,fd_socket);
 	MppDecoderInit();
 	AACDecoderInit();
-	//pthread_t aac_tid;
-	//pthread_create(&aac_tid, nullptr, threadAACdec, this);	
 }
 	
 int TcpClient::MppDecoderInit()
 {
-	int ret = 0;
+	int ret = 0;	
+	if(!mFYUVout)
+	{
+		mFYUVout = fopen("/data/scaleyuv.yuv","wb+");
+		if(!mFYUVout)
+			printf("open mFYUVout erroe\n");
+	}
 	mppctx = new Codec(this);
 	mppctx->mID = tcp->ClientId;
 	ret = mppctx->init(MPP_VIDEO_CodingAVC,1920,1080, 1);
@@ -128,17 +132,6 @@ void TcpClient::Release(bool selfDis) {
 		delete faaddecoder;
 		faaddecoder = nullptr;
 	}
-	if(YUVSplicingBuffer && tcp->Clientnum == 1)
-	{
-		free(YUVSplicingBuffer);
-		YUVSplicingBuffer = NULL;
-	}
-	if(mFYUVout && tcp->ClientPlayernum == 1)
-	{
-		fclose(mFYUVout);
-		printf("fclose YUV file\n");
-        mFYUVout = NULL;
-	}
 	if(tcp->Clientnum == 1)
 	{
 		pthread_mutex_destroy(&mutex_YUVSplicing);
@@ -187,7 +180,6 @@ void TcpClient::SendRequestQuality() {
 	mppctx->srcW =requestQuality.width;
 	mppctx->srcH =requestQuality.height;
 	printf("LCA QUALITY wxh[%d x %d] clientID %d\n",mppctx->srcW,mppctx->srcH,mppctx->mID);
-	//requestQuality.quality = 0;
 	requestQuality.video_fps = 0;
 	Send(TYPE_REQUEST_QUALITY, &requestQuality, sizeof(requestQuality));
 }
@@ -341,6 +333,8 @@ int TcpClient::SendMediaData(int type, int offset, int len) {
  */
 void TcpClient::StopCtrl() {
     working = false;
+	mediaDecoderReady = false;
+	mReceivedVideoProcessor.FreeList();
     sendCacheManager.ClearAudioData();
     sendCacheManager.ClearVideoData();
 }
@@ -607,17 +601,21 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
 				mppctx->mNum = tcp->ClientPlayernum;
 				printf("ClientPlayernum = %d\n",tcp->ClientPlayernum);
 				SendRequestQuality();
-				
 			}
-			//mediaDecoderReady = true;
-			ResetDecoderCtx(tcp->ClientPlayernum);
             working = true;
+			mediaDecoderReady = true;
             //report = true;
             break;
         case TYPE_MIRROR_STOP:
-			tcp->ClientPlayernum--;
-			printf("ClientPlayernum = %d\n",tcp->ClientPlayernum);
             StopCtrl();
+			pthread_mutex_lock(&mutex_YUVSplicing);
+			if(tcp->ClientPlayernum == 0 && mFYUVout)
+			{
+				fclose(mFYUVout);
+				printf("fclose YUV file\n");
+		        mFYUVout = NULL;
+			}
+			pthread_mutex_unlock(&mutex_YUVSplicing);
             report = true;
             break;
         case TYPE_TV_SCREEN_STOP:
@@ -633,31 +631,6 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
     }
 }
 
-void TcpClient::ResetDecoderCtx(int clientplayernum)
-{
-	if(clientplayernum == 1 && YUVSplicingBufferSize ==one_ResYUVSize)
-	{
-		mediaDecoderReady = true;
-		return;
-	}
-	else if(clientplayernum == 2 && YUVSplicingBufferSize ==two_ResYUVSize)
-	{
-		mediaDecoderReady = true;
-		return;
-	}
-	else if(clientplayernum == 3 && YUVSplicingBufferSize ==three_ResYUVSize)
-	{
-		mediaDecoderReady = true;
-		return;
-	}
-	else if(clientplayernum == 4 && YUVSplicingBufferSize ==four_ResYUVSize)
-	{
-		mediaDecoderReady = true;
-		return;
-	}
-	mppctx->ResetYUVSplicingBuffer(clientplayernum);
-	mediaDecoderReady = true;
-}
 /**
  * 定期发送心跳到Server
  * 只有Client才会启用，在 {@link #Connect}中自动创建线程
@@ -717,10 +690,9 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
 			{
 				mediaDecoderReady = false;
 				SendRequestQuality();
+				printf("LCA start free list:%d\n",mppctx->mID);
+				pProcessor->FreeList();			
 				mppctx->mNum = tcp->ClientPlayernum;
-				printf("LCA start free list\n");
-				pProcessor->FreeList();
-				ResetDecoderCtx(mppctx->mNum);
 			}
 		}
         ThreadSendData *data = pProcessor->GetData();

@@ -20,6 +20,17 @@ Tcp::Tcp(TcpNativeInfo *module) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         clients[i] = nullptr;
     }
+	TVScreenwidth = 1920;
+	TVScreenheight = 1080;
+	YUVSplicingBufferSize = TVScreenwidth * TVScreenheight *1.5;
+	if(!YUVSplicingBuffer)
+	{
+		YUVSplicingBuffer = (unsigned char *)malloc(YUVSplicingBufferSize);
+		if(!YUVSplicingBuffer)
+		{
+			printf("YUVSplicingBuffer malloc error\n");
+		}
+	}
 }
 
 Tcp::~Tcp() {
@@ -28,6 +39,11 @@ Tcp::~Tcp() {
         delete clients[i];
     }
     nativeInfo = nullptr;
+	if(YUVSplicingBuffer)
+	{
+		free(YUVSplicingBuffer);
+		YUVSplicingBuffer = NULL;
+	}
 }
 
 /**

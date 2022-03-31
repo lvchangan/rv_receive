@@ -41,6 +41,7 @@ target_link_libraries(rv1108_receive
     c 
     pthread
     libfaad.so
+    libyuv.so
 )
 
 

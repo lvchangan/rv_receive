@@ -6,7 +6,6 @@
 #include <cstring>
 #include <string.h>
 
-
 #include "vpu.h"
 #include "rk_mpi.h"
 #include "rk_type.h"
@@ -18,35 +17,18 @@
 #include "mpp_buffer.h"
 #include "mpp_packet.h"
 #include "rk_mpi_cmd.h"
-
 #include "mpp_mem.h"
 #include "mpp_env.h"
 #include "mpp_common.h"
 
-
 #include <list>
 #include "Event.h"
 
-//#define SZ_4K	0x00001000
+#include "libyuv.h"
 
 #define PKT_SIZE    SZ_4K
 #define CODEC_ALIGN(x, a)   (((x)+(a)-1)&~((a)-1))
-
-#define one_ResYSize  (1920*1080)
-#define one_ResYUVSize (1920*1080*1.5)
-
-#define two_ResYSize  (3200*900)
-#define two_ResYUVSize (3200*900*1.5)
-
-
-#define three_ResYSize  (3200*900)
-#define three_ResYUVSize (3200*1080*1.5)
-
-
-#define four_two_ResYSize  (2732*768)
-#define four_two_ResYUVSize (2732*768*1.5)
-
-#define four_ResYUVSize (2732*1536*1.5)
+#define min(a,b)            (((a) < (b)) ? (a) : (b))
 
 static pthread_mutex_t mutex_YUVSplicing = PTHREAD_MUTEX_INITIALIZER;
 
@@ -63,15 +45,14 @@ public:
     double get_frm_rate() {
         return mFrmRate;
     }
-	int ResetYUVSplicingBuffer(int codecnum);
-	int mEos;
-	int mID;
-	int mNum;
+	void GetDisplayerResolvingPower(int Mirrorwidth,int Mirrorheight);
+
+	int libyuv_scale(uint8 *src_buf,int src_w,int src_h,uint8 *dst_buf,int dst_w,int dst_h,enum libyuv::FilterMode filtering);
 	
+	int mID;
+	int mNum;	//解码投屏的数目
 	int srcW;	//解码的宽度
     int srcH;	//解码的高度
-    int srcYsize;
-    int srcYUVsize;
 private:
     int mFps;   
     int mDisPlay;
@@ -83,6 +64,15 @@ private:
 
 	int filewidth;
 
+	int oldmNum;
+	int oldsrcW;
+	int oldsrcH;
+	
+	int displayerwidth;		//显示的宽高
+	int displayerheight;
+
+	int TVCanvaswidth;	//TV画布的宽
+	int TVCanvasheight;	//TV画布的高
 	
     int mFrmCnt;	//解码帧数
     FILE *mFout;

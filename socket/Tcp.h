@@ -48,11 +48,14 @@ public:
     void OnUdpSliceReceived(SocketPackageData *packageData, struct in_addr addr);
 
 	
-	int Clientnum;
-	
+	int Clientnum;	//连接的客户端数目
 	int ClientId;
-
 	int ClientPlayernum;
+
+	int TVScreenwidth;
+	int TVScreenheight;
+	unsigned char *YUVSplicingBuffer;
+	int YUVSplicingBufferSize;
 private:
     TcpNativeInfo *nativeInfo;
 
