@@ -9,9 +9,6 @@
 #include "Locker.h"
 
 FILE * TcpClient::mFYUVout = NULL;
-/*unsigned char * TcpClient::YUVSplicingBuffer = NULL;
-int TcpClient::YUVSplicingBufferSize=0;*/
-
 /**
  * Tcp Server检测到一个Client连接时，创建 TcpClient 实例
  */
@@ -52,7 +49,7 @@ int TcpClient::MppDecoderInit()
 			printf("open mFYUVout erroe\n");
 	}
 	mppctx = new Codec(this);
-	mppctx->mID = tcp->ClientId;
+	ClientID = tcp->ClientId;
 	ret = mppctx->init(MPP_VIDEO_CodingAVC,1920,1080, 1);
 	if (ret < 0) {
 		printf("LCA: failed to init mpp\n");
@@ -179,7 +176,7 @@ void TcpClient::SendRequestQuality() {
 	}
 	mppctx->srcW =requestQuality.width;
 	mppctx->srcH =requestQuality.height;
-	printf("LCA QUALITY wxh[%d x %d] clientID %d\n",mppctx->srcW,mppctx->srcH,mppctx->mID);
+	printf("LCA QUALITY wxh[%d x %d] clientID %d\n",mppctx->srcW,mppctx->srcH,ClientID);
 	requestQuality.video_fps = 0;
 	Send(TYPE_REQUEST_QUALITY, &requestQuality, sizeof(requestQuality));
 }
@@ -334,7 +331,17 @@ int TcpClient::SendMediaData(int type, int offset, int len) {
 void TcpClient::StopCtrl() {
     working = false;
 	mediaDecoderReady = false;
+	 for (auto it = tcp->clientpalyerList.begin(); it != tcp->clientpalyerList.end(); it++) {
+	 	if(*it == ClientID)
+	 	{
+	 		printf("LCA delete List ClientID:%d\n",*it);
+            tcp->clientpalyerList.erase(it);
+			break;
+	 	}
+     }
 	mReceivedVideoProcessor.FreeList();
+	tcp->ClientPlayernum--;
+	mppctx->mNum = tcp->ClientPlayernum;
     sendCacheManager.ClearAudioData();
     sendCacheManager.ClearVideoData();
 }
@@ -598,10 +605,12 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
 			if(!working)
 			{
 				tcp->ClientPlayernum++;
-				mppctx->mNum = tcp->ClientPlayernum;
-				printf("ClientPlayernum = %d\n",tcp->ClientPlayernum);
+				printf("ClientPlayernum = %d,clientid:%d\n",tcp->ClientPlayernum,ClientID);
 				SendRequestQuality();
+				tcp->clientpalyerList.push_back(ClientID);
+				printf("LCA Create List ClientID:%d\n",ClientID);
 			}
+			mppctx->mNum = tcp->ClientPlayernum;
             working = true;
 			mediaDecoderReady = true;
             //report = true;
@@ -690,9 +699,8 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
 			{
 				mediaDecoderReady = false;
 				SendRequestQuality();
-				printf("LCA start free list:%d\n",mppctx->mID);
+				printf("LCA start free list:%d\n",ClientID);
 				pProcessor->FreeList();			
-				mppctx->mNum = tcp->ClientPlayernum;
 			}
 		}
         ThreadSendData *data = pProcessor->GetData();
@@ -745,7 +753,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                         continue;
                     }
                 }
-               // if (working) {
+                if (working) {
                		/*
                     if (bufferVideo && lenBufVideo >= data->dataSize) {
                         memcpy(bufferVideo, data->data, data->dataSize);
@@ -761,7 +769,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
 					if (ret < 0) {
 						printf("------------failed to MPP decode-----------\n");
 					}
-                //}
+                }
             }
 			if(data)
             free(data);

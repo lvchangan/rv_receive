@@ -361,13 +361,8 @@ private:
 		int MppDecoderInit();
 		int AACDecoderInit();
 		void SendRequestQuality();
-		//void ResetDecoderCtx(int clientplayernum);
-		
 		static FILE* mFYUVout;
-		/*
-		static unsigned char *YUVSplicingBuffer;
-
-		static int YUVSplicingBufferSize;*/
+		int ClientID;
 	private:
 	Codec *mppctx;
 	AAC2PCM *faaddecoder;

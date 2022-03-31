@@ -56,6 +56,8 @@ public:
 	int TVScreenheight;
 	unsigned char *YUVSplicingBuffer;
 	int YUVSplicingBufferSize;
+	
+	std::list<int> clientpalyerList;
 private:
     TcpNativeInfo *nativeInfo;
 

@@ -91,12 +91,12 @@ int Codec::init(MppCodingType type,
         printf("failed to exec mpp_init.\n");
         return -4;
     }
-
+	/*
 	int hor_stride = CODEC_ALIGN(srcW, 16);
     int ver_srride = CODEC_ALIGN(srcH, 16);
 	printf("hor_stride x ver_srride [%d x %d]\n",hor_stride,ver_srride);
 	mpp_buffer_get(mFrmGrp, &mBuffer, hor_stride * ver_srride * 3 / 2);
-	
+	*/
     return 0;
 }
 
@@ -166,6 +166,7 @@ int Codec::libyuv_scale(uint8 *src_buf,int src_w,int src_h,uint8 *dst_buf,int ds
           dst_w, dst_h,
           filtering
 		);
+	free(i420buffer);
 	return 0;
 }
 
@@ -207,7 +208,7 @@ int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
 		memset(pTcpClient->tcp->YUVSplicingBuffer+pTcpClient->tcp->TVScreenwidth*pTcpClient->tcp->TVScreenheight*5/4,
 			128,pTcpClient->tcp->TVScreenwidth*pTcpClient->tcp->TVScreenheight/4);
 		pthread_mutex_unlock(&mutex_YUVSplicing);
-		printf("ClientID:%d width x height:[%d x %d] displayerwidth x displayerheight:[%d x %d] mNum:%d\n",mID,width,height,displayerwidth,displayerheight,mNum);
+		printf("ClientID:%d width x height:[%d x %d] displayerwidth x displayerheight:[%d x %d] mNum:%d\n",pTcpClient->ClientID,width,height,displayerwidth,displayerheight,mNum);
 	}
 	
     base = (RK_U8 *)mpp_buffer_get_ptr(buffer);
@@ -232,6 +233,15 @@ int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
 	libyuv_scale(scalesrcbuffer,width,height,scaledstbuffer,displayerwidth,displayerheight,(enum libyuv::FilterMode)3);
 	//fwrite(scaledstbuffer,1,displayerwidth * displayerheight * 1.5,mFout);
 	free(scalesrcbuffer);
+
+	int playerid = 0;
+	for (auto it = pTcpClient->tcp->clientpalyerList.begin(); it != pTcpClient->tcp->clientpalyerList.end(); it++) {
+		playerid++;
+		if(*it == pTcpClient->ClientID)
+		{
+			break;
+	 	}
+    }
 	
 	int Y_start_section = 0;  //预处理图片Y分量存入目标区域的起始区域
 	int U_start_section = 0;
@@ -248,7 +258,7 @@ int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
 	}
 	if(mNum == 1 || mNum == 2)
 	{
-		if(mID == 0)
+		if(playerid == 1)
 		{
 			Y_start_section = blackoffset;
 			if(TVCanvasheight == displayerheight)
@@ -262,7 +272,7 @@ int Codec::dump_mpp_frame_to_file(MppFrame frame, FILE *fp)
 				V_start_section = pTcpClient->tcp->TVScreenwidth * pTcpClient->tcp->TVScreenheight *1.25 + blackoffset/4;
 			}
 		}
-		else if(mID == 1 && mNum == 2)
+		else if(playerid == 2 && mNum == 2)
 		{
 			Y_start_section = TVCanvaswidth + blackoffset;
 			if(TVCanvasheight == displayerheight)
@@ -288,8 +298,11 @@ ReadYUV(pTcpClient->tcp->YUVSplicingBuffer,scaledstbuffer,V_start_section,displa
 		fwrite(pTcpClient->tcp->YUVSplicingBuffer,1,pTcpClient->tcp->YUVSplicingBufferSize,pTcpClient->mFYUVout);
 pthread_mutex_unlock(&mutex_YUVSplicing);
 	}
+	
 
 	free(scaledstbuffer);
+
+	
 /*
 void Codec::ReadYUV(unsigned char* ResBuf,unsigned char* PreBuf, int resstart, int prestart, int resoffset, int preoffset, int size, int height)
 {
@@ -461,7 +474,13 @@ int Codec::decode_one_pkt(unsigned char *buf, int size) {
 	                            break;
 	                        }
                 	}
-           
+					
+       			    ret = mpp_buffer_group_limit_config(mFrmGrp, buf_size, 24);
+                    if (ret) {
+                        printf("limit buffer group failed ret %d\n", ret);
+                        break;
+                    }
+					
                     /*
                      * All buffer group config done. Set info change ready to let
                      * decoder continue decoding
