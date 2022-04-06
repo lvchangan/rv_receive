@@ -1,11 +1,5 @@
 LOCAL_PATH := $(call my-dir)
 
-include $(CLEAR_VARS)
-LOCAL_MODULE := rkmpp
-LOCAL_SRC_FILES := $(LOCAL_PATH)/libs/libmpp.so
-include $(PREBUILT_SHARED_LIBRARY)
-
-
 include $(CLEAR_VARS)  
 LOCAL_MODULE := Rk3229_receive
 
@@ -39,8 +33,6 @@ LOCAL_CFLAGS += -O3 -funroll-loops -finline-functions
 LOCAL_CFLAGS += -Wno-unused-result -Wno-unused-parameter  -Wno-unused-variable -Wno-Wsign-compare
 
 LOCAL_CPPFLAGS:= -std=c++11 -pthread    
-
-LOCAL_SHARED_LIBRARIES := rkmpp
 
 LOCAL_SHARED_LIBRARIES := \
 	libc \
