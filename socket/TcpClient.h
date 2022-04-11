@@ -26,7 +26,7 @@
 #include "Event.h"
 #include "UdpClient.h"
 #include "SendPackageCache.h"
-
+#include "decoder/avplayer.h"
 class TcpNativeInfo;
 
 class Tcp;
@@ -353,6 +353,8 @@ private:
 public:
 	Tcp *tcp;
 	void SendRequestQuality();
+	void videodecoderinit();
+	AVPlayer *avplayer;
 };
 
 

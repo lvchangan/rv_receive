@@ -32,7 +32,7 @@ TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockadd
     sendCacheManager.Create();
     mUdpCombinePackage = new UdpCombinePackage(this);
     CreateBufferVideo();
-	mediaDecoderReady = true;
+	videodecoderinit();
 }
 
 /**
@@ -78,6 +78,10 @@ void TcpClient::Release(bool selfDis) {
         delete udpClient;
         udpClient = nullptr;
     }
+	if(avplayer)
+	{
+		delete avplayer;
+	}
     mReceivedAudioProcessor.Destroy();
     mReceivedVideoProcessor.Destroy();
     sendCacheManager.Destroy();
@@ -585,6 +589,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                     }
                 }
                // if (working) {
+               
                     if (bufferVideo && lenBufVideo >= data->dataSize) {
                         memcpy(bufferVideo, data->data, data->dataSize);
                     }
@@ -592,6 +597,8 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                                                  data->time,
                                                  data->dataSize);
                     bzero(bufferVideo,2 * 1024 * 1024);
+                
+                	avplayer->FeedOneH264Frame(data->data,data->dataSize);
                     //printf("上报反向投屏数据 size = %d\n",data->dataSize);
                 //}
             }
@@ -647,7 +654,8 @@ TcpClient::ThreadSendData *TcpClient::ThreadDataProcessor::GetData() {
 }
 
 void TcpClient::ThreadDataProcessor::PutData(SocketPackageData *packageData) {
-    bool full = threadDataList.size() >= maxListCount;
+    //bool full = threadDataList.size() >= maxListCount;
+    bool full = false;
     if (full) {
         //数据满了，不能加入到
         if (packageData->type == TYPE_MEDIA_VIDEODATA) {
@@ -887,12 +895,24 @@ void TcpClient::SendRequestQuality() {
 	{
 		requestQuality.quality = 0;
 	}
-	/*
-	mppctx->srcW =requestQuality.width;
-	mppctx->srcH =requestQuality.height;
-	printf("LCA QUALITY wxh[%d x %d] clientID %d\n",mppctx->srcW,mppctx->srcH,ClientID);
-	*/
+	printf("LCA QUALITY quality:%d,wxh[%d x %d]\n",requestQuality.quality,requestQuality.width,requestQuality.height);
 	requestQuality.video_fps = 0;
 	Send(TYPE_REQUEST_QUALITY, &requestQuality, sizeof(requestQuality));
+}
+
+void TcpClient::videodecoderinit()
+{
+	avplayer = new AVPlayer();
+	avplayer->ClientID = tcp->ClientId;
+	int ret = avplayer->InitVideo();
+	if(ret)
+	{
+		printf("vedio deocder init error\n");
+	}
+	else
+	{
+		mediaDecoderReady = true;
+	}
+	return;
 }
 

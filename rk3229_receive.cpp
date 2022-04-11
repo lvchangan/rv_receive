@@ -29,10 +29,13 @@ static int _on_socket_received(void *UNUSED(user), TcpClient *client, int type, 
 	{
 		
 		fps++;
-		if(fps < 30)
+		if(fps < 200)
 		fwrite(data,1,len,fp_H264);
-		if(fps == 30)
+		if(fps == 200)
+		{
+			printf("fclose fp_H264\n");
 			fclose(fp_H264);
+		}
 	}
 	else if(type == TYPE_MEDIA_AUDIODATA)
 	{
