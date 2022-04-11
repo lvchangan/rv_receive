@@ -26,7 +26,9 @@
 #include "Event.h"
 #include "UdpClient.h"
 #include "SendPackageCache.h"
-#include "decoder/avplayer.h"
+#include "videodecoder/avplayer.h"
+#include "audiodecoder/audiodecoder.h"
+
 class TcpNativeInfo;
 
 class Tcp;
@@ -353,8 +355,12 @@ private:
 public:
 	Tcp *tcp;
 	void SendRequestQuality();
-	void videodecoderinit();
+	void mediadecoderinit();
 	AVPlayer *avplayer;
+	AACDecoder *aacdec;
+	bool aacDecoderReady = false;
+	int pcmsize;
+	INT_PCM* pcmframe;
 };
 
 

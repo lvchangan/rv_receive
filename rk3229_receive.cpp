@@ -27,7 +27,7 @@ static int _on_socket_received(void *UNUSED(user), TcpClient *client, int type, 
 	}
 	else if(type == TYPE_MEDIA_VIDEODATA)
 	{
-		
+		/*
 		fps++;
 		if(fps < 200)
 		fwrite(data,1,len,fp_H264);
@@ -36,6 +36,7 @@ static int _on_socket_received(void *UNUSED(user), TcpClient *client, int type, 
 			printf("fclose fp_H264\n");
 			fclose(fp_H264);
 		}
+		*/
 	}
 	else if(type == TYPE_MEDIA_AUDIODATA)
 	{

@@ -32,7 +32,8 @@ TcpClient::TcpClient(TcpNativeInfo *nativeInfo, Tcp *tcp, int fd, struct sockadd
     sendCacheManager.Create();
     mUdpCombinePackage = new UdpCombinePackage(this);
     CreateBufferVideo();
-	videodecoderinit();
+	CreateBufferAudio();
+	mediadecoderinit();
 }
 
 /**
@@ -46,11 +47,13 @@ TcpClient::TcpClient(TcpNativeInfo *nativeInfo)
     fd_socket = 0;
     pthread_mutex_init(&mutex_write, NULL);
     CreateBufferVideo();
+	CreateBufferAudio();
 }
 
 TcpClient::~TcpClient() {
     Release(false);
     ReleaseBufferVideo();
+	ReleaseBufferAudio();
     if (mUdpCombinePackage) {
         delete mUdpCombinePackage;
         mUdpCombinePackage = nullptr;
@@ -81,6 +84,14 @@ void TcpClient::Release(bool selfDis) {
 	if(avplayer)
 	{
 		delete avplayer;
+	}
+	if(aacdec)
+	{
+		delete aacdec;
+	}
+	if(pcmframe)
+	{
+		free(pcmframe);
 	}
     mReceivedAudioProcessor.Destroy();
     mReceivedVideoProcessor.Destroy();
@@ -571,13 +582,38 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
         if (data != nullptr) {
             //需要将数据发送出去
             if (data->type == TYPE_MEDIA_AUDIODATA) {
+				if (!this->aacDecoderReady) {
+                    int cnt = 100;
+                    while (this->running && this->working && !this->aacDecoderReady &&
+                           (--cnt > 0)) {
+                        usleep(100 * 1000);
+                        ALOGI("HQ NOT audioDecoderReady ...");
+                        continue;
+                    }
+                }
+				/*
                 if (bufferAudio && lenBufAudio >= data->dataSize) {
                     //ALOGI("HQ  recv TYPE_MEDIA_AUDIODATA ...dataSize=%d", packageData->dataSize);
                     memcpy(bufferAudio, data->data, data->dataSize);
                 }
-                nativeInfo->JniMessageReport(this, TYPE_MEDIA_AUDIODATA, nullptr, nullptr,
+                nativeInfo->JniMessageReport(this, TYPE_MEDIA_AUDIODATA, nullptr, bufferAudio,
                                              data->time,
                                              data->dataSize);
+
+				int ret = aacdec->decoder_one_aac(data->data,data->dataSize,pcmframe,&pcmsize);
+				if(ret > 0)
+				{
+					printf("decode error:%d\n",ret);
+				}
+				else
+				{
+					if(aacdec->fp_pcm)
+					 {
+					 	fwrite(pcmframe,1, pcmsize,aacdec->fp_pcm);
+					 }
+			 		 memset(pcmframe,0,pcmsize);
+				}
+				*/
             } else if (data->type == TYPE_MEDIA_VIDEODATA) {
                 if (!this->mediaDecoderReady) {
                     int cnt = 100;
@@ -589,7 +625,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                     }
                 }
                // if (working) {
-               
+               		/*
                     if (bufferVideo && lenBufVideo >= data->dataSize) {
                         memcpy(bufferVideo, data->data, data->dataSize);
                     }
@@ -597,7 +633,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                                                  data->time,
                                                  data->dataSize);
                     bzero(bufferVideo,2 * 1024 * 1024);
-                
+                	*/
                 	avplayer->FeedOneH264Frame(data->data,data->dataSize);
                     //printf("上报反向投屏数据 size = %d\n",data->dataSize);
                 //}
@@ -900,7 +936,7 @@ void TcpClient::SendRequestQuality() {
 	Send(TYPE_REQUEST_QUALITY, &requestQuality, sizeof(requestQuality));
 }
 
-void TcpClient::videodecoderinit()
+void TcpClient::mediadecoderinit()
 {
 	avplayer = new AVPlayer();
 	avplayer->ClientID = tcp->ClientId;
@@ -913,6 +949,19 @@ void TcpClient::videodecoderinit()
 	{
 		mediaDecoderReady = true;
 	}
+
+	aacdec = new AACDecoder();
+	pcmframe=(INT_PCM *)malloc(1024*5);
+	ret = aacdec->audioDecoderInit();
+	if(ret)
+	{
+		printf("audio deocder init error\n");
+	}
+	else
+	{
+		aacDecoderReady = true;
+	}
+	
 	return;
 }
 

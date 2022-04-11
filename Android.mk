@@ -1,7 +1,7 @@
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)  
-LOCAL_MODULE := Rk3229_receive
+LOCAL_MODULE := rk3229_receive
 
 LOCAL_SRC_FILES := \
 		rk3229_receive.cpp  	\
@@ -14,13 +14,15 @@ LOCAL_SRC_FILES := \
     	socket/TcpClient.cpp \
     	socket/UdpClient.cpp \
     	socket/CombinePackage.cpp \
-    	decoder/avplayer.cpp
+    	videodecoder/avplayer.cpp \
+    	audiodecoder/audiodecoder.cpp
 		
 		
 LOCAL_C_INCLUDES += \
 			 $(LOCAL_PATH) \
 			 $(LOCAL_PATH)/socket \
-			 $(LOCAL_PATH)/decoder
+			 $(LOCAL_PATH)/videodecoder \
+			 $(LOCAL_PATH)/audiodecoder
 
 LOCAL_CLANG := true
 LOCAL_CPPFLAGS := 
@@ -45,6 +47,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libc \
 	libstagefright liblog libutils libbinder libstagefright_foundation \
         libmedia libgui libcutils libui libtinyalsa libusbhost libz libbinder
+
+LOCAL_STATIC_LIBRARIES := libFraunhoferAAC
 
 ifeq ($(strip $(TARGET_BOARD_PLATFORM)), rk3036)
 LOCAL_SHARED_LIBRARIES += liblollipop_socket_ipc
