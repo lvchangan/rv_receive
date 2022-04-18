@@ -82,13 +82,12 @@ public:
 	int Clientnum;	//连接的客户端数目
 	int ClientId;	//连接的客户端ID
 	int ClientPlayernum;	//投屏的客户端数量
-
+	std::list<int> clientpalyerList; //投屏管理链表
+	
 	//int TVScreenwidth;
 	//int TVScreenheight;
 	//unsigned char *YUVSplicingBuffer;
-	//int YUVSplicingBufferSize;
-	
-	//std::list<int> clientpalyerList;
+	//int YUVSplicingBufferSize;	
 };
 
 

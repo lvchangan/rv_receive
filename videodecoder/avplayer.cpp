@@ -9,13 +9,29 @@
 extern "C" {
 //#include <lollipop_socket_ipc.h>
 }
-
+#include "socket/TcpClient.h"
+#include "socket/Tcp.h"
 #include "avplayer.h"
+
+
 
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
 
 static const char* kMimeTypeAvc = "video/avc";
+
+
+AVPlayer::AVPlayer(TcpClient *TcpClient)
+{
+	mVideoFrameCount = 0;
+	mBeginTime = 0;
+	pTcpClient = TcpClient;
+}
+
+AVPlayer::~AVPlayer(){
+	Dispose();
+}
+
 
 int AVPlayer::InitVideo()
 {
@@ -90,7 +106,7 @@ int AVPlayer::InitVideo()
     err = mCodec->getOutputBuffers(&mBuffers[1]);
     CHECK_EQ(err, (status_t)OK);
 
-
+	MakeBackground();
 	char outfilename[256];
 	sprintf(outfilename,"/data/yuvscale_%d.yuv",ClientID);
 	//printf("LCA outfilename = %s\n",outfilename);
@@ -119,7 +135,7 @@ void AVPlayer::MakeBackground()
     CHECK(mControlBG->isValid());
 	
 	SurfaceComposerClient::openGlobalTransaction();
-	CHECK_EQ(mControlBG->setLayer(INT_MAX - 1), (status_t)OK);
+	CHECK_EQ(mControlBG->setLayer(0x20000000 - 1), (status_t)OK);
     CHECK_EQ(mControlBG->show(), (status_t)OK);
     SurfaceComposerClient::closeGlobalTransaction();
 	
@@ -133,12 +149,31 @@ void AVPlayer::MakeBackground()
 void AVPlayer::CheckIfFormatChange()
 {
 	mCodec->getOutputFormat(&mFormat);
-		
+	if(pTcpClient->tcp->ClientPlayernum == 1 || pTcpClient->tcp->ClientPlayernum == 2)
+	{
+	 	TVCanvaswidth = SCREEN_WIDTH / pTcpClient->tcp->ClientPlayernum;
+		TVCanvasheight = SCREEN_HEIGHT;
+	}
+	else if(pTcpClient->tcp->ClientPlayernum == 3 || pTcpClient->tcp->ClientPlayernum == 4)
+	{
+		TVCanvaswidth = SCREEN_WIDTH / 2;
+		TVCanvasheight = SCREEN_HEIGHT / 2;
+	}
+
+	int playerid = 0;
+	for (auto it = pTcpClient->tcp->clientpalyerList.begin(); it != pTcpClient->tcp->clientpalyerList.end(); it++) {
+		if(*it == ClientID)
+		{
+			break;
+	 	}
+		playerid++;
+    }
+	
 	int width, height;
 	if (mFormat->findInt32("width", &width) &&
 		mFormat->findInt32("height", &height)) {
-		float scale_x = (SCREEN_WIDTH + 0.0) / width;
-		float scale_y = (SCREEN_HEIGHT + 0.0) / height;
+		float scale_x = (TVCanvaswidth + 0.0) / width;
+		float scale_y = (TVCanvasheight + 0.0) / height;
 		float scale = (scale_x < scale_y) ? scale_x : scale_y;
 		
 		scale = (scale > 1) ? 1 : scale;
@@ -147,26 +182,27 @@ void AVPlayer::CheckIfFormatChange()
 			int new_width = width * scale;
 			int new_height = height * scale;
 			
-			new_width = (new_width > SCREEN_WIDTH) ? SCREEN_WIDTH : new_width;
-			new_height = (new_height > SCREEN_HEIGHT) ? SCREEN_HEIGHT : new_height;
+			new_width = (new_width > TVCanvaswidth) ? TVCanvaswidth : new_width;
+			new_height = (new_height > TVCanvasheight) ? TVCanvasheight : new_height;
 			
 			width = new_width;
 			height = new_height;
 		}
 		
-		if (width > SCREEN_WIDTH)
-			width = SCREEN_WIDTH;
+		if (width > TVCanvaswidth)
+			width = TVCanvaswidth;
 		
-		if (height > SCREEN_HEIGHT)
-			height = SCREEN_HEIGHT;
-		
-		if (width != mWidth || height != mHeight) {
+		if (height > TVCanvasheight)
+			height = TVCanvasheight;
+
+		int x = (TVCanvaswidth - width) / 2 + TVCanvaswidth * (playerid < 2 ? playerid : (playerid - 2));
+		int y = (TVCanvasheight - height) / 2 + TVCanvasheight * (playerid < 2 ? 0 : 1);
+			
+		if (width != mWidth || height != mHeight || old_x != x || old_y != y) {
 			mWidth = width;
 			mHeight = height;
-			
-			int x = (SCREEN_WIDTH - width) / 2;
-			int y = (SCREEN_HEIGHT - height) / 2;
-			//printf("LCA width = %d,height = %d x = %d y = %d\n",width,height,x,y);
+			old_x = x;
+			old_y = y;
 			SurfaceComposerClient::openGlobalTransaction();
 			mControl->setSize(width, height);
 			mControl->setPosition(x, y);
@@ -175,26 +211,81 @@ void AVPlayer::CheckIfFormatChange()
 	}	
 }
 
+void AVPlayer::GetDisplayerResolvingPower(int Mirrorwidth,int Mirrorheight)
+{
+	if(pTcpClient->tcp->ClientPlayernum == 1 || pTcpClient->tcp->ClientPlayernum == 2)
+	{
+	 	TVCanvaswidth = SCREEN_WIDTH / pTcpClient->tcp->ClientPlayernum;
+		TVCanvasheight = SCREEN_HEIGHT;
+	}
+	else if(pTcpClient->tcp->ClientPlayernum == 3 || pTcpClient->tcp->ClientPlayernum == 4)
+	{
+		TVCanvaswidth = SCREEN_WIDTH / 2;
+		TVCanvasheight = SCREEN_HEIGHT / 2;
+	}
+	
+	float scaleMirror = (float)Mirrorwidth / (float)Mirrorheight;		//投屏的原图比例
+	float scaleTVCanvas = (float)TVCanvaswidth / (float)TVCanvasheight;	//TV端画布的比例
+		
+	if (scaleTVCanvas < scaleMirror) {
+			//TV端画布高度比例更高一些，应该以width做基准缩放
+			displayerwidth = TVCanvaswidth;
+			displayerheight = (int)(displayerwidth / scaleMirror);
+	}
+	else 
+	{
+		displayerheight = TVCanvasheight;
+		displayerwidth = displayerheight * scaleMirror;
+	}
+	displayerwidth = (displayerwidth + 1) & ~0x01;
+	displayerheight = (displayerheight + 1) & ~0x01;
+	
+	int x = (TVCanvaswidth - displayerwidth)/2 + TVCanvaswidth * ClientID;
+	int y = (TVCanvasheight - displayerheight)/2;
+
+	printf("ClentID : %d wxh[%dx%d] x.y[%d.%d]\n",ClientID,displayerwidth,displayerheight,x,y);
+	SurfaceComposerClient::openGlobalTransaction();
+	mControl->setSize(displayerwidth, displayerheight);
+	mControl->setPosition(x, y);
+	SurfaceComposerClient::closeGlobalTransaction();
+}
+
+
 void AVPlayer::RenderFrames()
 {
 	size_t index, offset, size;
 	int64_t pts;
 	uint32_t flags;
-	
+	int width,height;
 	int err = OK;
 	
 	do {
+		
 		CheckIfFormatChange();
 		
 		err = mCodec->dequeueOutputBuffer(
 			&index, &offset, &size, &pts, &flags);
 
 		if (err == OK) {	
-			sp<ABuffer> buffer;  
+			/*sp<ABuffer> buffer;  
    			mCodec->getOutputBuffer(index, &buffer);		
 			fwrite(buffer->data(),1,size,mFout);
-			mCodec->releaseOutputBuffer(index);
-			//mCodec->renderOutputBufferAndRelease(index);
+			mCodec->releaseOutputBuffer(index);*/
+			/*
+			if(old_num != pTcpClient->tcp->ClientPlayernum||old_w != width||old_h !=height)
+			{
+				mCodec->getOutputFormat(&mFormat);
+				if (mFormat->findInt32("width", &width) && mFormat->findInt32("height", &height)) 
+				{
+					GetDisplayerResolvingPower(width,height);
+					old_num = pTcpClient->tcp->ClientPlayernum;
+					old_w = width;
+					old_h = height;
+				}
+			}
+			*/
+			
+			mCodec->renderOutputBufferAndRelease(index);
 			
 			/*
 			mVideoFrameCount++;
@@ -275,11 +366,11 @@ void AVPlayer::Dispose()
 	
 	SurfaceComposerClient::openGlobalTransaction();
     CHECK_EQ(mControl->hide(), (status_t)OK);
-	//CHECK_EQ(mControlBG->hide(), (status_t)OK);
+	CHECK_EQ(mControlBG->hide(), (status_t)OK);
     SurfaceComposerClient::closeGlobalTransaction();	
 	mComposerClient->dispose();
 	mControl->clear();
-	//mControlBG->clear();
+	mControlBG->clear();
 
     //lollipop_socket_client_send(SOCK_FILE_SOFTAP, IPC_UI_SHOW);
 	fclose(mFout);

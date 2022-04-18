@@ -1,5 +1,6 @@
 #ifndef _AV_PLAYER_H_
 #define _AV_PLAYER_H_
+
 #include <unistd.h>
 #include <pthread.h>
 #include <queue>
@@ -30,13 +31,9 @@ using namespace android;
 class AVPlayer
 {
 public:
-	AVPlayer() {
-		mVideoFrameCount = 0;
-		mBeginTime = 0;
-    }
-	~AVPlayer(){
-		Dispose();
-    }
+	AVPlayer(TcpClient *TcpClient);
+	~AVPlayer();
+	
 	int InitVideo();
 	int FeedOneH264Frame(unsigned char* frame, int size);
 	void MakeBackground();
@@ -58,18 +55,30 @@ public:
 	void RenderFrames();
 	static void* VideoRenderThread(void* arg);
 	void Dispose();
-	
+	void GetDisplayerResolvingPower(int Mirrorwidth,int Mirrorheight);
 private:		
 	int mVideoFrameCount;
 	clock_t mBeginTime;
 public:
 	FILE *mFout;
 	int ClientID;
+	TcpClient *pTcpClient;
+	
 	long get_sys_runtime(int type);
 	long time;
 	int fps_in;
 	int fps_out;
 	int fps_time;
 	int time_flag;
+
+	int TVCanvaswidth;
+	int TVCanvasheight;
+	int displayerwidth;
+	int displayerheight;
+	int old_w;
+	int old_h;
+	int old_num;
+	int old_x;
+	int old_y;
 };
 #endif

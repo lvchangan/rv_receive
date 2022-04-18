@@ -93,6 +93,15 @@ void TcpClient::Release(bool selfDis) {
 	{
 		free(pcmframe);
 	}
+	for (auto it = tcp->clientpalyerList.begin(); it != tcp->clientpalyerList.end(); it++) {
+	 	if(*it == avplayer->ClientID)
+	 	{
+	 		printf("LCA Release delete List ClientID:%d\n",*it);
+	        tcp->clientpalyerList.erase(it);
+			tcp->ClientPlayernum--;
+			break;
+	 	}
+	}
     mReceivedAudioProcessor.Destroy();
     mReceivedVideoProcessor.Destroy();
     sendCacheManager.Destroy();
@@ -246,6 +255,16 @@ int TcpClient::SendMediaData(int type, int offset, int len) {
  */
 void TcpClient::StopCtrl() {
     working = false;
+	mediaDecoderReady = false;
+	for (auto it = tcp->clientpalyerList.begin(); it != tcp->clientpalyerList.end(); it++) {
+	 	if(*it == avplayer->ClientID)
+	 	{
+	 		printf("LCA delete List ClientID:%d\n",*it);
+	        tcp->clientpalyerList.erase(it);
+			tcp->ClientPlayernum--;
+			break;
+	 	}
+	} 
     sendCacheManager.ClearAudioData();
     sendCacheManager.ClearVideoData();
 }
@@ -503,8 +522,16 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
             //检测到开始，清空数据
             sendCacheManager.ClearAudioData();
             sendCacheManager.ClearVideoData();
-			SendRequestQuality();
+			if(!working)
+			{
+				tcp->ClientPlayernum++;
+				printf("ClientPlayernum = %d,clientid:%d\n",tcp->ClientPlayernum,avplayer->ClientID);
+				SendRequestQuality();
+				tcp->clientpalyerList.push_back(avplayer->ClientID);
+				printf("LCA Create List ClientID:%d\n",avplayer->ClientID);
+			}
             working = true;
+			mediaDecoderReady = true;
             report = true;
             break;
         case TYPE_MIRROR_STOP:
@@ -614,7 +641,8 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
 			 		 memset(pcmframe,0,pcmsize);
 				}
 				*/
-            } else if (data->type == TYPE_MEDIA_VIDEODATA) {
+            }
+			else if (data->type == TYPE_MEDIA_VIDEODATA) {
                 if (!this->mediaDecoderReady) {
                     int cnt = 100;
                     while (this->running && this->working && !this->mediaDecoderReady &&
@@ -931,6 +959,7 @@ void TcpClient::SendRequestQuality() {
 	{
 		requestQuality.quality = 0;
 	}
+	requestQuality.quality = 0;
 	printf("LCA QUALITY quality:%d,wxh[%d x %d]\n",requestQuality.quality,requestQuality.width,requestQuality.height);
 	requestQuality.video_fps = 0;
 	Send(TYPE_REQUEST_QUALITY, &requestQuality, sizeof(requestQuality));
@@ -938,16 +967,12 @@ void TcpClient::SendRequestQuality() {
 
 void TcpClient::mediadecoderinit()
 {
-	avplayer = new AVPlayer();
+	avplayer = new AVPlayer(this);
 	avplayer->ClientID = tcp->ClientId;
 	int ret = avplayer->InitVideo();
 	if(ret)
 	{
 		printf("vedio deocder init error\n");
-	}
-	else
-	{
-		mediaDecoderReady = true;
 	}
 
 	aacdec = new AACDecoder();

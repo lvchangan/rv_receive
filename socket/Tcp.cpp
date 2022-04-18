@@ -21,6 +21,7 @@ Tcp::Tcp(TcpNativeInfo *module) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         clients[i] = nullptr;
     }
+	ClientPlayernum = 0;
 }
 
 Tcp::~Tcp() {
