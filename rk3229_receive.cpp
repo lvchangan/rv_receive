@@ -60,10 +60,11 @@ int main()
 	//fp_aac = fopen("/data/receive.aac","wb+");
 	
     tcpNativeInfo.SetCallback(nullptr, _on_socket_received);
-	Tcp *rv1108_receive = new Tcp(&tcpNativeInfo);
-	rv1108_receive->StartServer(6666);
-	receive_UDP->StartServer(rv1108_receive,6666);
+	Tcp *rk3229_receive = new Tcp(&tcpNativeInfo);
+	rk3229_receive->StartServer(6666);
+	receive_UDP->StartServer(rk3229_receive,6666);
 	while(1);
-	delete rv1108_receive;
+	delete receive_UDP;
+	delete rk3229_receive;
 }
 

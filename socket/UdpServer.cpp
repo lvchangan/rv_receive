@@ -87,7 +87,7 @@ void UdpServer::AnswerRadioBroadcast(struct sockaddr_in cli)
 	char answerdata[256];
 	answerdata[offset++] = '$';
 	answerdata[offset++] = 0x11;
-	char devicemessage[125] = "RV1108_receive&B0:C5:CA:75:8E:ED";
+	char devicemessage[125] = "RV3229_receive&B0:C5:CA:75:8E:ED";
 	int len = strlen(devicemessage);
 	answerdata[offset++] = len;
 	memcpy(answerdata+offset,devicemessage,len);
