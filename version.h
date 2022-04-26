@@ -1,0 +1,6 @@
+#ifndef LOLLIPOP_VERSION_H
+#define LOLLIPOP_VERSION_H
+
+#define VERSION "6.02.00"
+
+#endif //LOLLIPOP_VERSION_H
