@@ -626,7 +626,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                 nativeInfo->JniMessageReport(this, TYPE_MEDIA_AUDIODATA, nullptr, bufferAudio,
                                              data->time,
                                              data->dataSize);
-
+				*/
 				int ret = aacdec->decoder_one_aac(data->data,data->dataSize,pcmframe,&pcmsize);
 				if(ret > 0)
 				{
@@ -634,13 +634,14 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
 				}
 				else
 				{
-					if(aacdec->fp_pcm)
+					/*if(aacdec->fp_pcm)
 					 {
 					 	fwrite(pcmframe,1, pcmsize,aacdec->fp_pcm);
-					 }
+					 }*/
+					 avplayer->FeedOnePcmFrame((unsigned char*)pcmframe,pcmsize);
 			 		 memset(pcmframe,0,pcmsize);
 				}
-				*/
+				
             }
 			else if (data->type == TYPE_MEDIA_VIDEODATA) {
                 if (!this->mediaDecoderReady) {
@@ -974,7 +975,12 @@ void TcpClient::mediadecoderinit()
 	{
 		printf("vedio deocder init error\n");
 	}
-
+	ret= avplayer->InitAudio(0,0);
+	if(ret)
+	{
+		printf("audio palyer init error\n");
+	}
+	
 	aacdec = new AACDecoder();
 	pcmframe=(INT_PCM *)malloc(1024*5);
 	ret = aacdec->audioDecoderInit();

@@ -28,11 +28,23 @@
 
 using namespace android;
 
+struct audio_frame
+{
+    unsigned char* data;
+    int len;
+};
+
+#define FRAME_SIZE 32768
+#define FRAME_COUNT 8
+
 class AVPlayer
 {
 public:
 	AVPlayer(TcpClient *TcpClient);
 	~AVPlayer();
+
+	int InitAudio(int sample_rate, int channel);
+	int FeedOnePcmFrame(unsigned char* frame, int len);
 	
 	int InitVideo();
 	int FeedOneH264Frame(unsigned char* frame, int size);
@@ -59,6 +71,22 @@ public:
 private:		
 	int mVideoFrameCount;
 	clock_t mBeginTime;
+
+	AudioTrack* mAudioTrack;
+	
+	std::queue<struct audio_frame> mFreeQueue;
+    std::queue<struct audio_frame> mDataQueue;
+
+    void AudioQueueInit();
+    bool AudioQueueBuffer(unsigned char* buffer, int len);
+
+    void ProcessAudioData();
+	bool mAudioThreadRunning;
+    static void* AudioThread(void* arg);
+	
+	unsigned char mAudioBuffer[FRAME_SIZE * FRAME_COUNT];
+	
+	void* mPrivate;
 public:
 	FILE *mFout;
 	int ClientID;
@@ -81,4 +109,5 @@ public:
 	int old_x;
 	int old_y;
 };
+
 #endif
