@@ -63,7 +63,7 @@ int AVPlayer::InitVideo()
     mControl = mComposerClient->createSurface(String8("Lollipop_wifi UI Surface"),
             dinfo.w, dinfo.h, PIXEL_FORMAT_RGBA_8888, 0);
     SurfaceComposerClient::openGlobalTransaction();
-    mControl->setLayer(0x20000000);
+    mControl->setLayer(1000);
     mControl->setPosition(0,0);
     mControl->setSize(dinfo.w,dinfo.h);
     mControl->show();
@@ -106,7 +106,7 @@ int AVPlayer::InitVideo()
     err = mCodec->getOutputBuffers(&mBuffers[1]);
     CHECK_EQ(err, (status_t)OK);
 
-	MakeBackground();
+	//MakeBackground();
 	char outfilename[256];
 	sprintf(outfilename,"/data/yuvscale_%d.yuv",ClientID);
 	//printf("LCA outfilename = %s\n",outfilename);
@@ -354,6 +354,19 @@ int AVPlayer::FeedOneH264Frame(unsigned char* frame, int size)
 	return err;
 }
 
+void AVPlayer::hideUI(void) {
+    SurfaceComposerClient::openGlobalTransaction();
+    CHECK_EQ(mControl->hide(), (status_t)OK);
+    SurfaceComposerClient::closeGlobalTransaction();
+}
+
+void AVPlayer::showUI(void) {
+	SurfaceComposerClient::openGlobalTransaction();
+     CHECK_EQ(mControl->show(), (status_t)OK);
+    SurfaceComposerClient::closeGlobalTransaction();
+}
+
+
 void AVPlayer::Dispose()
 {
 	mAudioThreadRunning = false;
@@ -366,12 +379,12 @@ void AVPlayer::Dispose()
 	mRendering = false;
 	SurfaceComposerClient::openGlobalTransaction();
     CHECK_EQ(mControl->hide(), (status_t)OK);
-	CHECK_EQ(mControlBG->hide(), (status_t)OK);
+	//CHECK_EQ(mControlBG->hide(), (status_t)OK);
     SurfaceComposerClient::closeGlobalTransaction();	
 	
 	mComposerClient->dispose();
 	mControl->clear();
-	mControlBG->clear();
+	//mControlBG->clear();
 
     //lollipop_socket_client_send(SOCK_FILE_SOFTAP, IPC_UI_SHOW);
 	fclose(mFout);

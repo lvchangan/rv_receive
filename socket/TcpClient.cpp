@@ -394,6 +394,7 @@ void TcpClient::DoRecvLoop() {
     running = false;
     newClientReported = false;
 	ALOGI("LCA DISCONNECT_CLIENT\n");
+	tcp->Clientnum--;
     nativeInfo1->JniMessageReport(this, TYPE_DISCONNECT_CLIENT,
                                   this->selfDisconnect ? "1" : nullptr, nullptr, 0, 0);
     delete[] buffer;
@@ -530,11 +531,13 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
 				tcp->clientpalyerList.push_back(avplayer->ClientID);
 				printf("LCA Create List ClientID:%d\n",avplayer->ClientID);
 			}
+			avplayer->showUI();
             working = true;
 			mediaDecoderReady = true;
             report = true;
             break;
         case TYPE_MIRROR_STOP:
+			avplayer->hideUI();
             StopCtrl();
             report = true;
             break;

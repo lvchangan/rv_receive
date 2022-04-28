@@ -66,6 +66,8 @@ public:
 	void CheckIfFormatChange();
 	void RenderFrames();
 	static void* VideoRenderThread(void* arg);
+	void showUI(void);
+	void hideUI(void);
 	void Dispose();
 	void GetDisplayerResolvingPower(int Mirrorwidth,int Mirrorheight);
 private:		
