@@ -377,10 +377,10 @@ void AVPlayer::Dispose()
 	
 	
 	mRendering = false;
-	SurfaceComposerClient::openGlobalTransaction();
-    CHECK_EQ(mControl->hide(), (status_t)OK);
+	//SurfaceComposerClient::openGlobalTransaction();
+    //CHECK_EQ(mControl->hide(), (status_t)OK);
 	//CHECK_EQ(mControlBG->hide(), (status_t)OK);
-    SurfaceComposerClient::closeGlobalTransaction();	
+    //SurfaceComposerClient::closeGlobalTransaction();	
 	
 	mComposerClient->dispose();
 	mControl->clear();

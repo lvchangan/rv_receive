@@ -63,7 +63,7 @@ TcpClient::~TcpClient() {
 }
 
 void TcpClient::Release(bool selfDis) {
-    if (this->fd_socket <= 0) return;
+    //if (this->fd_socket <= 0) return;
     this->addr.sin_addr.s_addr = 0;
     pthread_mutex_lock(&mutex_write);
     int fd = fd_socket;
@@ -92,15 +92,6 @@ void TcpClient::Release(bool selfDis) {
 	if(pcmframe)
 	{
 		free(pcmframe);
-	}
-	for (auto it = tcp->clientpalyerList.begin(); it != tcp->clientpalyerList.end(); it++) {
-	 	if(*it == avplayer->ClientID)
-	 	{
-	 		printf("LCA Release delete List ClientID:%d\n",*it);
-	        tcp->clientpalyerList.erase(it);
-			tcp->ClientPlayernum--;
-			break;
-	 	}
 	}
     mReceivedAudioProcessor.Destroy();
     mReceivedVideoProcessor.Destroy();
@@ -255,6 +246,7 @@ int TcpClient::SendMediaData(int type, int offset, int len) {
  */
 void TcpClient::StopCtrl() {
     working = false;
+	avplayer->hideUI();
 	mediaDecoderReady = false;
 	for (auto it = tcp->clientpalyerList.begin(); it != tcp->clientpalyerList.end(); it++) {
 	 	if(*it == avplayer->ClientID)
@@ -265,6 +257,9 @@ void TcpClient::StopCtrl() {
 			break;
 	 	}
 	} 
+	mReceivedAudioProcessor.ClearThreadData();
+	mReceivedVideoProcessor.ClearThreadData();
+	
     sendCacheManager.ClearAudioData();
     sendCacheManager.ClearVideoData();
 }
@@ -277,6 +272,7 @@ void *TcpClient::threadRecv(void *p) {
     client->tidRecv = pthread_self();
     //pthread_detach(pthread_self());
     client->DoRecvLoop();
+	client->fd_socket = -1;
     return nullptr;
 }
 
@@ -359,7 +355,7 @@ void TcpClient::DoRecvLoop() {
                 //判断总的接收超时（HEARTBEAT也没有接收到）
                 //15秒还没有接收到对方的Socket数据，认为连接中断了
                 //请注意：15仅仅是PAPA同屏器端，TV端保持5秒不变
-                if (++mRecvTimeoutCounter >= 15) {
+                if (++mRecvTimeoutCounter >= 5) {
                     break;
                 }
                 if (errno == EAGAIN || errno == EINTR) {
@@ -394,6 +390,10 @@ void TcpClient::DoRecvLoop() {
     running = false;
     newClientReported = false;
 	ALOGI("LCA DISCONNECT_CLIENT\n");
+	if(working)
+	{
+		StopCtrl();
+	}
 	tcp->Clientnum--;
     nativeInfo1->JniMessageReport(this, TYPE_DISCONNECT_CLIENT,
                                   this->selfDisconnect ? "1" : nullptr, nullptr, 0, 0);
@@ -537,7 +537,6 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
             report = true;
             break;
         case TYPE_MIRROR_STOP:
-			avplayer->hideUI();
             StopCtrl();
             report = true;
             break;
@@ -699,6 +698,12 @@ void TcpClient::ThreadDataProcessor::Destroy() {
         pthread_mutex_unlock(&mutex_thread_data);
         pthread_mutex_destroy(&mutex_thread_data);
     }
+}
+
+void TcpClient::ThreadDataProcessor::ClearThreadData(){
+	 pthread_mutex_lock(&mutex_thread_data);
+     threadDataList.clear();
+     pthread_mutex_unlock(&mutex_thread_data);
 }
 
 /**

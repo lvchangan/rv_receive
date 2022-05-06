@@ -48,6 +48,10 @@ static int _on_socket_received(void *UNUSED(user), TcpClient *client, int type, 
 			fclose(fp_aac);
 		*/
 	}
+	else if(type == TYPE_DISCONNECT_CLIENT)
+	{
+		//delete client;
+	}
 	return 0;
 }
 							 

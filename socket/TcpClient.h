@@ -280,7 +280,9 @@ private:
         void Create(int sizeCollections);
 
         void Destroy();
-
+		
+		void ClearThreadData();
+		
         ThreadSendData *GetData();
 
         void PutData(SocketPackageData *packageData);
