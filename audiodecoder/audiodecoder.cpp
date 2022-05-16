@@ -88,11 +88,13 @@ int AACDecoder::decoder_one_aac(unsigned char* bufferAAC, int buf_sizeAAC,INT_PC
 	    if (aac_stream_info == NULL) {  
 	        printf("aacDecoder_GetStreamInfo failed!\n");  
 	        return -3;
-	    }  
+	    } 
+#if 0
 	    printf(">stream info:channel = %d sample_rate = %d samples = %d aot = %d bitRate = %d numTotalBytes = %d\n" \
 	    		,aac_stream_info->channelConfig, aac_stream_info->aacSampleRate \ 
 	            ,aac_stream_info->aacSamplesPerFrame, aac_stream_info->aot, aac_stream_info->bitRate \
 	            ,aac_stream_info->numTotalBytes);
+#endif
 		//注意fdk_aac编码只接受16位,解码出来默认16位
 		if(decoderErr == AAC_DEC_OK)
 		{

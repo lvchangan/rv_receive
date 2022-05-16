@@ -44,7 +44,7 @@ public:
 	~AVPlayer();
 
 	int InitAudio(int sample_rate, int channel);
-	int FeedOnePcmFrame(unsigned char* frame, int len);
+	int FeedOnePcmFrame(unsigned char* frame, int len,bool mute);
 	
 	int InitVideo();
 	int FeedOneH264Frame(unsigned char* frame, int size);

@@ -442,8 +442,14 @@ int AVPlayer::InitAudio(int sample_rate, int channel)
 	return 0;
 }
 
-int AVPlayer::FeedOnePcmFrame(unsigned char* frame, int len)
+int AVPlayer::FeedOnePcmFrame(unsigned char* frame, int len,bool mute)
 {
+	if (mute) {
+      for (int i = 0; i < len; i++) 
+	  {
+         frame[i] = 0xff;
+      }
+   }
 	AudioQueueBuffer(frame, len);
 	return 0;
 }

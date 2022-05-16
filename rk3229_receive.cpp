@@ -45,7 +45,10 @@ static int _on_socket_received(void *UNUSED(user), TcpClient *client, int type, 
 		if(fps_aac < 500)
 		fwrite(data,1,len,fp_aac);
 		if(fps_aac == 500)
+		{
+			printf("fclose fps_aac\n");
 			fclose(fp_aac);
+		}
 		*/
 	}
 	else if(type == TYPE_DISCONNECT_CLIENT)
@@ -58,7 +61,7 @@ static int _on_socket_received(void *UNUSED(user), TcpClient *client, int type, 
 
 int main()
 {
-	fp_H264 = fopen("/data/receive.h264","wb+");
+	//fp_H264 = fopen("/data/receive.h264","wb+");
 	
 	UdpServer *receive_UDP = new UdpServer();
 	//fp_aac = fopen("/data/receive.aac","wb+");

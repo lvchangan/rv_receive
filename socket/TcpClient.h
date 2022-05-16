@@ -363,6 +363,8 @@ public:
 	bool aacDecoderReady = false;
 	int pcmsize;
 	INT_PCM* pcmframe;
+	long playAudioFrameTimestamp = 0;
+	long playAudioFrameCount = 0;
 };
 
 

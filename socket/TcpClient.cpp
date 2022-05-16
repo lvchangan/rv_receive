@@ -629,6 +629,14 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
                                              data->time,
                                              data->dataSize);
 				*/
+				long ts = avplayer->get_sys_runtime(2);
+				if (ts - playAudioFrameTimestamp >= 300) {
+					//已经超过了播放时间
+					playAudioFrameCount = 0;
+				}
+				playAudioFrameTimestamp = ts;
+				playAudioFrameCount++;
+				
 				int ret = aacdec->decoder_one_aac(data->data,data->dataSize,pcmframe,&pcmsize);
 				if(ret > 0)
 				{
@@ -640,7 +648,7 @@ void TcpClient::DoThreadReportData(ThreadDataProcessor *pProcessor) {
 					 {
 					 	fwrite(pcmframe,1, pcmsize,aacdec->fp_pcm);
 					 }*/
-					 avplayer->FeedOnePcmFrame((unsigned char*)pcmframe,pcmsize);
+					 avplayer->FeedOnePcmFrame((unsigned char*)pcmframe,pcmsize,playAudioFrameCount < 20);
 			 		 memset(pcmframe,0,pcmsize);
 				}
 				
@@ -968,7 +976,7 @@ void TcpClient::SendRequestQuality() {
 	{
 		requestQuality.quality = 0;
 	}
-	requestQuality.quality = 0;
+	requestQuality.quality = 5;
 	printf("LCA QUALITY quality:%d,wxh[%d x %d]\n",requestQuality.quality,requestQuality.width,requestQuality.height);
 	requestQuality.video_fps = 0;
 	Send(TYPE_REQUEST_QUALITY, &requestQuality, sizeof(requestQuality));
