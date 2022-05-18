@@ -358,6 +358,7 @@ public:
 	Tcp *tcp;
 	void SendRequestQuality();
 	void mediadecoderinit();
+	void Update3229Img(SendUpdateMessage *update_file);
 	AVPlayer *avplayer;
 	AACDecoder *aacdec;
 	bool aacDecoderReady = false;
@@ -365,6 +366,7 @@ public:
 	INT_PCM* pcmframe;
 	long playAudioFrameTimestamp = 0;
 	long playAudioFrameCount = 0;
+	WriteFileInfo writefile = {0};
 };
 
 

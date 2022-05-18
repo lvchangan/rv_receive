@@ -301,6 +301,37 @@ uint32_t TcpClient::SetUdpSupport(uint32_t udpSupport) {
     return this->udpSupportType;
 }
 
+void TcpClient::Update3229Img(SendUpdateMessage *update_file) {
+	printf("index = %d,totalSize=%d,len=%d\n",update_file->index,update_file->totalSize,update_file->len);
+	if(update_file->index == 0)
+	{
+		writefile.updatefp = fopen("/data/boot.img", "w");
+		writefile.totalSize = update_file->totalSize;
+        writefile.fileVersion = update_file->fileVersion;
+        writefile.writeIndex = 0;
+        writefile.writeTotal = 0;
+	}
+	if(writefile.updatefp != NULL)
+	{
+		//写入数据
+        if(update_file->len > 0) {
+            int wd = fwrite(update_file->data, 1, update_file->len,writefile.updatefp);
+            if(wd > 0) {
+                writefile.writeTotal += wd;
+            }
+        }
+        writefile.writeIndex = update_file->index; 
+		printf("len = %d,writeIndex=%d,writeTotal=%d\n",update_file->len,writefile.writeIndex,writefile.writeTotal);
+        //判断是否写入完成 
+        if(writefile.writeTotal == writefile.totalSize) {
+            fflush(writefile.updatefp);
+            fclose(writefile.updatefp);
+			printf("update_file write success\n");
+            writefile.updatefp = NULL;
+        } 
+	}
+}
+
 void TcpClient::DoRecvLoop() {
     //PC端1920*1080视频数据一帧最大有1M，设置2M的缓存
     const int BUFSIZE = ((1024 + 1024) * 1024);
@@ -412,7 +443,9 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
     //接收到数据后计数器复位。目前udp也会调用此函数
     mRecvTimeoutCounter = 0;
     ClientInfo *clientInfo;
+	SendUpdateMessage *update_file;
     SocketHeartbeat hb = {0};
+	UpdateImgMessage updatem = {0};
     switch (packageData->type) {
         case TYPE_CLIENT_NAME:
             //上报 TYPE_NEW_CLIENT 消息
@@ -544,6 +577,23 @@ void TcpClient::DoRecvMessage(SocketPackageData *packageData) {
             bzero(bufferVideo,2 * 1024 * 1024);
             report = true;
             break;
+		case TYPE_3229_Version:
+			memcpy(&updatem, packageData->data, sizeof(updatem)<packageData->dataSize?sizeof(updatem):packageData->dataSize);
+			if(updatem.rid == 0) //服务端接收
+			{
+				updatem.rid = 1;
+				if(updatem.version > 241)
+				{
+					updatem.version = 241;
+					updatem.isupdate = true;
+				}
+				Send(TYPE_3229_Version, &updatem, sizeof(updatem));
+			}
+			break;
+		case TYPE_3229_Update:
+			update_file = (SendUpdateMessage *) packageData->data;
+			Update3229Img(update_file);
+			break;
         default:
             report = true;
     }

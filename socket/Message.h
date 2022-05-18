@@ -5,7 +5,7 @@
 
 #ifndef SOCKET_MESSAGE_H
 #define SOCKET_MESSAGE_H
-
+#include <stdio.h>
 /**
  * 定义消息类型
  * 需要与JAVA层的对应。JNI层上报到JAVA处理时，也会附带消息类型
@@ -121,6 +121,17 @@ const int TYPE_UDP_ACK2 = 0x0022;
  * 消息体为 UdpPackageReply2
  */
 const int TYPE_UDP_REQUEST2 = 0x0023;
+/**
+ * 发送用于告知3229接收端data目录下3229安装包版本号
+ * 接受用于判断是否发送3229安装包
+ * 消息体为 UpdateImgMessage
+ */
+const int TYPE_3229_Version = 0x0024;
+/**
+ * 发送3229升级的安装包
+ * 消息体为 SendUpdateMessage
+ */
+const int TYPE_3229_Update = 0x0025;
 /**
  * 投屏模式为NONE，一般为关闭时发送
  */
@@ -666,5 +677,40 @@ typedef struct SocketHeartbeat_s {
      */
     uint32_t msgFlags;
 } SocketHeartbeat;
+
+typedef struct UpdateImgMessage_s{
+	int32_t version;
+	int32_t rid;
+	bool isupdate;
+}UpdateImgMessage;
+
+typedef struct SendUpdateMessage_s{
+    //取值为 sizeof(SendUpdateMessage)
+    int32_t version;
+    //本次发送的文件版本
+    int32_t fileVersion;
+    //本次写入的文件总的大小
+    int32_t totalSize;
+    //第几次写入。第一次写入则为0
+    //0表示写入开始
+    int32_t index;
+    //本次写入数据的大小，实际上为 data[0] 的有效大小
+    int32_t len;
+    uint8_t  data[0];
+} SendUpdateMessage;
+
+typedef struct WriteFileInfo_s {
+    //文件版本
+    int fileVersion;
+    // 写入的序号。从0开始
+    int writeIndex;
+    //HOST告知的总文件大小
+    int totalSize;
+    //已经写入的文件大小
+    int writeTotal;
+    //写入的文件句柄
+    FILE *updatefp;
+}WriteFileInfo;
+
 
 #endif //SOCKET_MESSAGE_H
